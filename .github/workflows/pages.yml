@@ -29,6 +29,9 @@ jobs:
 
       - name: Configure Pages
         uses: actions/configure-pages@v5
+        with:
+          # Enable GitHub Pages (source: GitHub Actions) if it is not yet enabled.
+          enablement: true
 
       - name: Upload static site
         uses: actions/upload-pages-artifact@v3
