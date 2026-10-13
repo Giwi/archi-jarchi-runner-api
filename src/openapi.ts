@@ -15,6 +15,7 @@ export const openApiDocument = {
   servers: [{ url: '/' }],
   tags: [
     { name: 'Run', description: 'Execute jArchi scripts against a model.' },
+    { name: 'Export', description: 'Generate documentation (Markdown + Mermaid) from views.' },
     { name: 'Models', description: 'Git-managed model repositories under /models.' },
     { name: 'Scripts', description: 'Git-managed script repositories under /scripts.' },
     { name: 'System', description: 'Health and metadata.' },
@@ -79,6 +80,46 @@ export const openApiDocument = {
           result: { $ref: '#/components/schemas/ResultPayload' },
         },
         required: ['correlationId', 'stdout', 'stderr', 'exitCode', 'result'],
+      },
+      MermaidExportRequest: {
+        type: 'object',
+        properties: {
+          correlationId: { type: 'string', minLength: 1, example: 'export-1' },
+          model: {
+            type: 'string',
+            minLength: 1,
+            description: 'Path inside /models (repository folder or .archimate file).',
+          },
+          view: {
+            type: 'string',
+            description: 'View id (#id) or exact view name. Mutually exclusive with `folder`.',
+          },
+          folder: {
+            type: 'string',
+            description:
+              'Model folder name or slash-separated folder path; every view under it is exported. ' +
+              'Mutually exclusive with `view`. Omit both to export the whole model.',
+          },
+          direction: { type: 'string', enum: ['LR', 'RL', 'TB', 'BT'], default: 'LR' },
+          relationships: { type: 'boolean', default: true, description: 'Include relationships as edges.' },
+        },
+        required: ['correlationId', 'model'],
+      },
+      MermaidExportResponse: {
+        allOf: [
+          { $ref: '#/components/schemas/RunResponse' },
+          {
+            type: 'object',
+            properties: {
+              markdown: {
+                type: 'string',
+                nullable: true,
+                description: 'Generated Markdown with one Mermaid `flowchart` per view.',
+              },
+            },
+            required: ['markdown'],
+          },
+        ],
       },
       Repo: {
         type: 'object',
@@ -172,6 +213,22 @@ export const openApiDocument = {
           '401': { description: 'Missing or invalid x-api-key', content: { 'application/json': { schema: { $ref: '#/components/schemas/Error' } } } },
           '404': { description: 'Model not found', content: { 'application/json': { schema: { $ref: '#/components/schemas/Error' } } } },
           '504': { description: 'Run timed out', content: { 'application/json': { schema: { $ref: '#/components/schemas/RunResponse' } } } },
+        },
+      },
+    },
+    '/api/export/mermaid': {
+      post: {
+        tags: ['Export'],
+        summary: 'Export ArchiMate view(s) as Markdown with Mermaid flowcharts',
+        requestBody: {
+          required: true,
+          content: { 'application/json': { schema: { $ref: '#/components/schemas/MermaidExportRequest' } } },
+        },
+        responses: {
+          '200': { description: 'Generated', content: { 'application/json': { schema: { $ref: '#/components/schemas/MermaidExportResponse' } } } },
+          '400': { description: 'Invalid request', content: { 'application/json': { schema: { $ref: '#/components/schemas/Error' } } } },
+          '404': { description: 'Model not found, or no views matched', content: { 'application/json': { schema: { $ref: '#/components/schemas/Error' } } } },
+          '504': { description: 'Run timed out', content: { 'application/json': { schema: { $ref: '#/components/schemas/MermaidExportResponse' } } } },
         },
       },
     },

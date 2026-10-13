@@ -1,13 +1,12 @@
 import { Router, type NextFunction, type Request, type Response } from 'express';
 
 import { runArchi } from '../archi/runner.js';
-import { config } from '../config.js';
 import { HttpError } from '../errors.js';
+import { runLimiter } from '../limiter.js';
 import { log } from '../logger.js';
-import { Semaphore } from '../queue.js';
 import type { RunRequestBody } from '../types.js';
 
-const limiter = new Semaphore(config.maxConcurrency);
+const limiter = runLimiter;
 
 function parseBody(value: unknown): RunRequestBody {
   if (typeof value !== 'object' || value === null || Array.isArray(value)) {

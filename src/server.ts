@@ -4,6 +4,7 @@ import { config } from './config.js';
 import { HttpError, isHttpError } from './errors.js';
 import { log } from './logger.js';
 import { openApiDocument } from './openapi.js';
+import { exportRouter } from './routes/export.js';
 import { createReposRouter } from './routes/repos.js';
 import { runRouter } from './routes/run.js';
 
@@ -42,6 +43,7 @@ export function createApp(): express.Express {
   });
 
   app.use('/api', runRouter);
+  app.use('/api', exportRouter);
 
   // Git-managed model repositories (sub-folders of the models volume).
   app.use(

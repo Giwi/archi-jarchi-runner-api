@@ -475,6 +475,32 @@ scripts/fetch-archi.sh</pre>
       <p>OpenAPI 3.0 document describing every endpoint. Point your own Swagger UI or client generator at it.</p>
     </div>
 
+    <h3>Export views to Markdown + Mermaid</h3>
+    <div class="card" style="margin-bottom:12px">
+      <h3><span class="method post">POST</span> <span class="k">/api/export/mermaid</span></h3>
+      <p>Run a bundled jArchi script that turns one view, a model folder, or the whole model into Markdown with a Mermaid <span class="k">flowchart</span> per view.</p>
+    </div>
+    <pre>curl -s http://localhost:3000/api/export/mermaid \
+  -H <span class="s">'content-type: application/json'</span> \
+  -d <span class="s">'{
+    "correlationId": "export-1",
+    "model": "my-model",
+    "view": "Customer Journey",
+    "direction": "LR"
+  }'</span></pre>
+    <div class="table-scroll">
+      <table>
+        <thead><tr><th>Field</th><th>Description</th></tr></thead>
+        <tbody>
+          <tr><td><code>view</code></td><td>View id (<code>#id</code>) or exact name. Mutually exclusive with <code>folder</code>.</td></tr>
+          <tr><td><code>folder</code></td><td>Model folder name or <code>Parent/Child</code> path; exports every view under it.</td></tr>
+          <tr><td><code>direction</code></td><td><code>LR</code> (default) | <code>RL</code> | <code>TB</code> | <code>BT</code>.</td></tr>
+          <tr><td><code>relationships</code></td><td>Include relationships as edges (default <code>true</code>).</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p class="sub" style="margin-top:12px">Omit <code class="inline">view</code> and <code class="inline">folder</code> to export all views. The response adds a top-level <code class="inline">markdown</code> field; <code class="inline">404</code> means the model is missing or no view matched.</p>
+
     <h3>Result convention</h3>
     <p class="sub">
       A script advertises a result file by printing a JSON object with a

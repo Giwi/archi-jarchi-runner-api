@@ -5,7 +5,7 @@ import path from 'node:path';
 import { config } from '../config.js';
 import { HttpError } from '../errors.js';
 import { log } from '../logger.js';
-import type { RunRequestBody, RunResult } from '../types.js';
+import type { RunRequestBody, RunResult, RunScriptRequest } from '../types.js';
 import { findResultFile, readResult } from './result.js';
 
 interface ResolvedModel {
@@ -52,9 +52,14 @@ async function resolveModel(model: string): Promise<ResolvedModel> {
 
 /**
  * Prelude injected in front of every user script. Exposes a small helper so
- * scripts can publish a result without hard-coding paths.
+ * scripts can publish a result without hard-coding paths, plus any options the
+ * server wants to pass through.
  */
-function buildPrelude(runDir: string, correlationId: string): string {
+function buildPrelude(
+  runDir: string,
+  correlationId: string,
+  options: Record<string, unknown> = {},
+): string {
   const resultFile = path.join(runDir, 'result.json');
   const quote = (value: unknown) => JSON.stringify(value);
   return [
@@ -63,6 +68,7 @@ function buildPrelude(runDir: string, correlationId: string): string {
     `  correlationId: ${quote(correlationId)},`,
     `  runDir: ${quote(runDir)},`,
     `  resultFile: ${quote(resultFile)},`,
+    `  options: ${quote(options)},`,
     '  setResult: function (value) {',
     '    jArchi.fs.writeFile(archiServer.resultFile, JSON.stringify(value));',
     '    console.log(JSON.stringify({ resultFile: archiServer.resultFile }));',
@@ -141,15 +147,28 @@ function spawnArchi(args: string[], cwd: string): Promise<SpawnOutcome> {
 }
 
 export async function runArchi(body: RunRequestBody): Promise<RunResult> {
-  const model = await resolveModel(body.model);
+  return runArchiScript({
+    correlationId: body.correlationId,
+    model: body.model,
+    script: body.script,
+  });
+}
+
+/**
+ * Run an arbitrary jArchi script against a model. Used by both the user-facing
+ * `/run` endpoint and server-provided scripts (e.g. the Mermaid exporter).
+ */
+export async function runArchiScript(request: RunScriptRequest): Promise<RunResult> {
+  const { correlationId, script, options } = request;
+  const model = await resolveModel(request.model);
   await mkdir(config.runsDir, { recursive: true });
 
   const runDir = await mkdtemp(path.join(config.runsDir, 'run-'));
   const scriptPath = path.join(runDir, 'script.ajs');
-  await writeFile(scriptPath, buildPrelude(runDir, body.correlationId) + body.script, 'utf8');
+  await writeFile(scriptPath, buildPrelude(runDir, correlationId, options) + script, 'utf8');
 
   const args = buildArchiArgs(model, scriptPath);
-  log.debug('starting archi', { correlationId: body.correlationId, model, args });
+  log.debug('starting archi', { correlationId, model, args });
 
   const startedAt = Date.now();
   let outcome: SpawnOutcome;
@@ -171,7 +190,7 @@ export async function runArchi(body: RunRequestBody): Promise<RunResult> {
       result = await readResult(resultPath, config.resultMaxBytes);
     } catch (error) {
       log.warn('could not read advertised result file', {
-        correlationId: body.correlationId,
+        correlationId,
         resultFile: resultPath,
         error: String(error),
       });
@@ -187,7 +206,7 @@ export async function runArchi(body: RunRequestBody): Promise<RunResult> {
     : outcome.stderr;
 
   log.info('archi run finished', {
-    correlationId: body.correlationId,
+    correlationId,
     exitCode: outcome.exitCode,
     timedOut: outcome.timedOut,
     durationMs,
@@ -195,7 +214,7 @@ export async function runArchi(body: RunRequestBody): Promise<RunResult> {
   });
 
   return {
-    correlationId: body.correlationId,
+    correlationId,
     stdout: outcome.stdout,
     stderr,
     exitCode: outcome.exitCode,

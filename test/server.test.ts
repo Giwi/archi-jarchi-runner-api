@@ -65,7 +65,7 @@ describe('system endpoints', () => {
     assert.equal(reply.status, 200);
     const doc = reply.body as { openapi: string; paths: Record<string, unknown> };
     assert.match(doc.openapi, /^3\./);
-    for (const expected of ['/health', '/api/run', '/api/models', '/api/scripts', '/api/models/{id}/sync']) {
+    for (const expected of ['/health', '/api/run', '/api/export/mermaid', '/api/models', '/api/scripts', '/api/models/{id}/sync']) {
       assert.ok(doc.paths[expected], `missing path ${expected}`);
     }
   });
@@ -137,6 +137,31 @@ describe('repository endpoints', () => {
     assert.equal((await call('/api/models/ghost/sync', { method: 'POST', headers: JSON_HEADERS })).status, 404);
     assert.equal((await call('/api/models/ghost', { method: 'DELETE', headers: AUTH })).status, 404);
     assert.equal((await call('/api/scripts/ghost', { method: 'DELETE', headers: AUTH })).status, 404);
+  });
+});
+
+describe('mermaid export endpoint', () => {
+  const post = (body: unknown): Promise<Reply> =>
+    call('/api/export/mermaid', { method: 'POST', headers: JSON_HEADERS, body: JSON.stringify(body) });
+
+  test('requires correlationId and model', async () => {
+    assert.equal((await post({ correlationId: 'x' })).status, 400);
+    assert.equal((await post({ model: 'm.archimate' })).status, 400);
+  });
+
+  test('rejects view and folder together', async () => {
+    const reply = await post({ correlationId: 'x', model: 'm.archimate', view: 'A', folder: 'B' });
+    assert.equal(reply.status, 400);
+  });
+
+  test('rejects an invalid direction', async () => {
+    const reply = await post({ correlationId: 'x', model: 'm.archimate', direction: 'SIDEWAYS' });
+    assert.equal(reply.status, 400);
+  });
+
+  test('returns 404 for an unknown model', async () => {
+    const reply = await post({ correlationId: 'x', model: 'ghost.archimate' });
+    assert.equal(reply.status, 404);
   });
 });
 

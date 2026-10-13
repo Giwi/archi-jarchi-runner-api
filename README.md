@@ -186,6 +186,44 @@ sequenceDiagram
   S-->>C: 200 {correlationId, stdout, stderr, exitCode, result}
 ```
 
+### `POST /api/export/mermaid`
+
+Generate Markdown with one Mermaid `flowchart` per ArchiMate view. The server
+runs a bundled jArchi script that walks the view(s) and returns the Markdown.
+
+```json
+{
+  "correlationId": "export-1",
+  "model": "my-model",
+  "view": "Customer Journey",
+  "direction": "LR",
+  "relationships": true
+}
+```
+
+- `model` resolved inside `/models` (a repository folder or a `.archimate` file).
+- `view` *(optional)*: a view id (`#id`) or its exact name.
+- `folder` *(optional)*: a model folder name, or a `Parent/Child` path; every
+  view under it is exported. Mutually exclusive with `view`.
+- Omit both `view` and `folder` to export **all** views.
+- `direction`: `LR` (default), `RL`, `TB` or `BT`.
+- `relationships`: include relationships as edges (default `true`).
+
+The response is the standard `/api/run` envelope plus `markdown`:
+
+```json
+{
+  "correlationId": "export-1",
+  "exitCode": 0,
+  "markdown": "# ArchiMate views\n\n## Customer Journey\n\n```mermaid\nflowchart LR\n  n1[\"Customer<br/>(business actor)\"]\n  n2[\"Agent<br/>(business role)\"]\n  n1 -->|\"assigned to\"| n2\n```",
+  "result": { "file": "...", "encoding": "json", "content": { "markdown": "...", "views": [ ... ], "count": 1 } }
+}
+```
+
+`result.content.views` summarises each exported view (`id`, `name`, `type`,
+`nodes`, `edges`). Returns `404` when the model is missing **or** when no view
+matches `view`/`folder`.
+
 ### Model repositories
 
 Models are **git-managed sub-folders of `/models`**. Each is identified by an

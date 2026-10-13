@@ -4,6 +4,34 @@ export interface RunRequestBody {
   model: string;
 }
 
+/** Parameters for a server-driven jArchi run (script supplied by the server). */
+export interface RunScriptRequest {
+  correlationId: string;
+  model: string;
+  script: string;
+  /** Exposed to the script as `archiServer.options`. */
+  options?: Record<string, unknown>;
+}
+
+export type MermaidDirection = 'LR' | 'RL' | 'TB' | 'BT';
+
+export interface MermaidExportRequest {
+  correlationId: string;
+  model: string;
+  /** View id (`#id`) or exact view name. */
+  view?: string;
+  /** Model folder name or slash-separated folder path. */
+  folder?: string;
+  direction?: MermaidDirection;
+  /** Include relationships as edges (default true). */
+  relationships?: boolean;
+}
+
+export interface MermaidExportResponse extends RunResponse {
+  /** Generated markdown (convenience copy of `result.content.markdown`). */
+  markdown: string | null;
+}
+
 export type RepoKind = 'model' | 'script';
 
 /** A git-managed repository living as a sub-folder of a mounted volume. */
