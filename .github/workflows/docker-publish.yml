@@ -18,10 +18,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Set up Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v5
         with:
           node-version: '22'
           cache: npm
@@ -45,7 +45,7 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       # vendor/ is git-ignored, so binaries are fetched/built here.
 
@@ -59,12 +59,14 @@ jobs:
         run: scripts/fetch-archi.sh
 
       - name: Set up JDK 21
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: '21'
           cache: maven
 
+      # Maven is pinned by the committed wrapper (mvnw) to a Tycho-compatible
+      # 3.9.x, because the runner's Maven 3.10 breaks Tycho 4.
       - name: Build jArchi from source
         run: scripts/build-plugins.sh
         env:

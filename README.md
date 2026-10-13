@@ -63,7 +63,9 @@ Compiles jArchi `v1.11.0` with Maven/Tycho against the local Archi install
 scripts/build-plugins.sh
 ```
 
-Resulting bundles land in `vendor/plugins/com.archimatetool.script*.jar`.
+Resulting bundles land in `vendor/plugins/com.archimatetool.script*.jar`. The
+build uses the committed Maven wrapper (`./mvnw`), which pins a Tycho-compatible
+Maven 3.9.x, so no local Maven is required.
 
 ## 2. Build and run
 

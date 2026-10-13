@@ -23,7 +23,15 @@ if [ ! -x "$ARCHI_DIR/Archi" ]; then
   echo "Archi not found at $ARCHI_DIR. Run scripts/fetch-archi.sh first." >&2
   exit 1
 fi
-command -v mvn >/dev/null 2>&1 || { echo "maven (mvn) is required" >&2; exit 1; }
+
+# Prefer the pinned Maven wrapper: Tycho 4.x is not compatible with Maven 4 and
+# can also break on some 3.10 builds. The wrapper pins a known-good 3.9.x.
+if [ -x "$ROOT/mvnw" ]; then
+  MVN="$ROOT/mvnw"
+else
+  command -v mvn >/dev/null 2>&1 || { echo "maven (mvn) is required" >&2; exit 1; }
+  MVN="mvn"
+fi
 
 mkdir -p "$PLUGINS_DIR" "$WORK"
 
@@ -53,8 +61,8 @@ for module in com.archimatetool.script com.archimatetool.script.commandline; do
 done
 
 # 4. Build.
-echo "==> maven/tycho build"
-mvn -B -f "$BUILD_DIR/pom.xml" clean package -DskipTests -Darchi.p2repo="$P2REPO"
+echo "==> maven/tycho build ($("$MVN" -v 2>/dev/null | head -1))"
+"$MVN" -B -f "$BUILD_DIR/pom.xml" clean package -DskipTests -Darchi.p2repo="$P2REPO"
 
 # 5. Publish artifacts.
 find "$BUILD_DIR/jarchi" -path '*/target/*.jar' ! -name '*sources*' -exec cp -f {} "$PLUGINS_DIR"/ \;
