@@ -1,0 +1,31 @@
+services:
+  archi-server:
+    build:
+      context: .
+      args:
+        # Match the host user that owns ./data so git can write into the volumes.
+        ARCHI_UID: "${ARCHI_UID:-1001}"
+    image: archi-server:latest
+    container_name: archi-server
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      PORT: "3000"
+
+      # Per-run JVM heap (injected into Archi.ini by the entrypoint).
+      ARCHI_XMS: "512m"
+      ARCHI_XMX: "4g"
+
+      # Hard timeout and parallelism (each run is a JVM + X display).
+      ARCHI_TIMEOUT_MS: "180000"
+      ARCHI_MAX_CONCURRENCY: "1"
+
+      # Uncomment to require an `x-api-key` header on every request.
+      # API_KEY: "change-me"
+
+    volumes:
+      # jArchi user scripts folder. Writable: it holds git-managed script repos.
+      - ./data/scripts:/scripts
+      # coArchi repositories and/or plain *.archimate models (git-managed sub-folders).
+      - ./data/models:/models

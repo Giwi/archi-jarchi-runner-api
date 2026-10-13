@@ -1,0 +1,824 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>archi-server - headless Archi API</title>
+<meta name="description" content="HTTP API that runs Archi headless with jArchi and coArchi plugins.">
+<meta name="color-scheme" content="dark">
+<meta name="theme-color" content="#08090a">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@100..900&display=swap">
+<style>
+  :root {
+    /* Linear-inspired palette */
+    --bg: #08090a;
+    --bg-2: #010102;
+    --panel: #0f1011;
+    --panel-2: #141516;
+    --border: rgba(255, 255, 255, 0.08);
+    --border-strong: rgba(255, 255, 255, 0.14);
+    --text: #f7f8f8;
+    --muted: #8a8f98;
+    --accent: #7170ff;
+    --accent-2: #4ea7fc;
+    --green: #68cc58;
+    --amber: #d4b144;
+    --red: #f2555a;
+    --mono: "Berkeley Mono", ui-monospace, "SF Mono", "JetBrains Mono", Menlo, Consolas, monospace;
+    --sans: "Inter Variable", Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    --radius: 12px;
+    --maxw: 1024px;
+    --shadow: 0 1px 1px 0 rgba(0, 0, 0, 0.09), 0 2px 4px rgba(0, 0, 0, 0.12);
+  }
+
+  * { box-sizing: border-box; }
+
+  html { scroll-behavior: smooth; scroll-padding-top: 92px; }
+
+  body {
+    margin: 0;
+    min-height: 100%;
+    font-family: var(--sans);
+    font-feature-settings: "cv01" 1, "ss03" 1;
+    color: var(--text);
+    background:
+      radial-gradient(900px 520px at 50% -12%, rgba(94, 106, 210, 0.18), transparent 62%),
+      radial-gradient(680px 420px at 88% -6%, rgba(113, 112, 255, 0.10), transparent 58%),
+      var(--bg);
+    line-height: 1.6;
+    letter-spacing: -0.011em;
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+
+  /* faint technical grid, fading toward the bottom */
+  .bg-grid {
+    position: fixed; inset: 0; z-index: 0; pointer-events: none;
+    background-image:
+      linear-gradient(rgba(255, 255, 255, 0.022) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(255, 255, 255, 0.022) 1px, transparent 1px);
+    background-size: 48px 48px;
+    -webkit-mask-image: radial-gradient(ellipse 95% 62% at 50% 0%, #000 20%, transparent 72%);
+    mask-image: radial-gradient(ellipse 95% 62% at 50% 0%, #000 20%, transparent 72%);
+  }
+
+  a { color: var(--accent); text-decoration: none; }
+  a:hover { text-decoration: underline; text-underline-offset: 3px; text-decoration-color: var(--border-strong); }
+
+  ::selection { background: rgba(113, 112, 255, 0.3); color: #fff; }
+  :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 5px; }
+
+  .wrap { max-width: var(--maxw); margin: 0 auto; padding: 0 22px; }
+
+  /* ---- scroll progress ---- */
+  .progress {
+    position: fixed; top: 0; left: 0; z-index: 60;
+    height: 2px; width: 0;
+    background: linear-gradient(90deg, var(--accent), var(--accent-2));
+    box-shadow: 0 0 12px rgba(113, 112, 255, 0.55);
+    transition: width 0.12s linear;
+  }
+
+  /* ---- top bar ---- */
+  header.top {
+    position: sticky; top: 0; z-index: 50;
+    background: rgba(8, 9, 10, 0.8);
+    backdrop-filter: blur(20px) saturate(160%);
+    -webkit-backdrop-filter: blur(20px) saturate(160%);
+    border-bottom: 1px solid var(--border);
+  }
+  .top-inner {
+    max-width: var(--maxw); margin: 0 auto; padding: 14px 22px;
+    display: flex; align-items: center; gap: 18px; justify-content: space-between;
+  }
+  .brand { display: flex; align-items: center; gap: 9px; font-weight: 590; letter-spacing: -0.02em; font-size: 14.5px; }
+  .brand .mark {
+    width: 15px; height: 15px; border-radius: 4px;
+    background: linear-gradient(140deg, #828fff, #5e6ad2 55%, #4ea7fc);
+    box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.08), 0 0 14px rgba(113, 112, 255, 0.4);
+  }
+  nav.top-nav { display: flex; gap: 22px; flex-wrap: wrap; }
+  nav.top-nav a {
+    position: relative; padding: 5px 1px; color: var(--muted); font-size: 13.5px; font-weight: 510;
+    transition: color 0.2s ease;
+  }
+  nav.top-nav a::after {
+    content: ""; position: absolute; left: 0; right: 0; bottom: -1px; height: 1.5px; border-radius: 2px;
+    background: var(--text);
+    transform: scaleX(0); transform-origin: left; transition: transform 0.25s ease;
+  }
+  nav.top-nav a:hover { color: var(--text); text-decoration: none; }
+  nav.top-nav a:hover::after, nav.top-nav a.active::after { transform: scaleX(1); }
+  nav.top-nav a.active { color: var(--text); }
+
+  /* ---- hero ---- */
+  .hero { position: relative; padding: 84px 0 46px; }
+  .hero::after {
+    content: ""; position: absolute; z-index: -1;
+    top: -60px; left: 50%; width: 720px; height: 360px; transform: translateX(-50%); pointer-events: none;
+    background: radial-gradient(closest-side, rgba(94, 106, 210, 0.22), transparent);
+    filter: blur(40px);
+  }
+  .eyebrow {
+    display: inline-flex; align-items: center; gap: 8px;
+    font-size: 12px; letter-spacing: 0.01em; font-weight: 510;
+    color: var(--muted);
+    border: 1px solid var(--border); background: var(--panel);
+    padding: 5px 11px; border-radius: 8px;
+    box-shadow: var(--shadow);
+  }
+  h1.title {
+    font-size: clamp(2.5rem, 5.5vw, 3.75rem);
+    line-height: 1.06; margin: 20px 0 16px; letter-spacing: -0.022em; font-weight: 590;
+    color: var(--text);
+    text-wrap: balance;
+  }
+  .lede { font-size: clamp(16px, 2.1vw, 18.5px); color: var(--muted); max-width: 720px; }
+  .lede strong { color: var(--text); font-weight: 590; }
+  .pills { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 26px; }
+  .pill {
+    display: inline-flex; align-items: center; gap: 7px;
+    font-size: 12.5px; font-weight: 510;
+    border: 1px solid var(--border); border-radius: 8px; padding: 5px 11px;
+    background: var(--panel);
+    color: var(--muted);
+  }
+  .pill::before {
+    content: ""; width: 6px; height: 6px; border-radius: 50%;
+    background: var(--accent); box-shadow: 0 0 8px rgba(113, 112, 255, 0.8);
+  }
+  .pill b { color: var(--text); font-weight: 590; }
+
+  /* ---- sections ---- */
+  main { position: relative; z-index: 1; padding-bottom: 90px; }
+  section { padding: 44px 0; border-top: 1px solid var(--border); }
+  section:first-of-type { border-top: 0; }
+  h2 {
+    font-size: 1.5rem; letter-spacing: -0.012em; margin: 0 0 6px; font-weight: 590;
+    display: flex; align-items: center; gap: 10px;
+  }
+  h2 .hash {
+    color: #62666d; font-family: var(--mono); font-weight: 400;
+    opacity: 0.5; transition: opacity 0.2s ease, color 0.2s ease;
+  }
+  section:hover h2 .hash { opacity: 1; color: var(--accent); }
+  h3 { font-size: 1.0625rem; margin: 26px 0 10px; letter-spacing: -0.012em; font-weight: 590; }
+  .sub { color: var(--muted); margin: 0 0 22px; }
+
+  .grid { display: grid; gap: 16px; }
+  .cols-2 { grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); }
+  .cols-3 { grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); }
+
+  .card {
+    position: relative;
+    background: var(--panel);
+    border: 1px solid var(--border); border-radius: var(--radius);
+    padding: 20px; box-shadow: var(--shadow);
+    transition: border-color 0.2s ease, transform 0.2s ease;
+  }
+  .card:hover {
+    transform: translateY(-1px);
+    border-color: var(--border-strong);
+  }
+  .card h3 { margin-top: 0; }
+  .card p { margin: 0; color: var(--muted); font-size: 14px; }
+  .card .k { font-family: var(--mono); color: var(--accent); font-size: 12.5px; }
+
+  /* ---- code ---- */
+  .code-wrap { position: relative; margin: 12px 0; }
+  .code-wrap pre { margin: 0; }
+  pre {
+    background: var(--panel); border: 1px solid var(--border);
+    border-radius: 10px; padding: 15px 16px; overflow-x: auto;
+    font-family: var(--mono); font-size: 12.8px; line-height: 1.65; color: #d0d6e0;
+    tab-size: 2;
+  }
+  pre::-webkit-scrollbar { height: 9px; }
+  pre::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.14); border-radius: 9px; }
+  pre .c { color: #62666d; }
+  pre .s { color: #68cc58; }
+  pre .k { color: #a5a2ff; }
+  .copy {
+    position: absolute; top: 8px; right: 8px;
+    font-family: var(--mono); font-size: 10.5px; letter-spacing: 0.06em; text-transform: uppercase;
+    color: var(--muted); background: rgba(15, 16, 17, 0.9);
+    border: 1px solid var(--border); border-radius: 6px; padding: 4px 9px;
+    cursor: pointer; opacity: 0;
+    transition: opacity 0.2s ease, color 0.2s ease, border-color 0.2s ease;
+  }
+  .code-wrap:hover .copy, .copy:focus-visible { opacity: 1; }
+  .copy:hover { color: var(--text); border-color: var(--border-strong); }
+  .copy.ok { color: var(--green); border-color: rgba(104, 204, 88, 0.45); }
+
+  code.inline {
+    font-family: var(--mono); font-size: 0.88em;
+    background: var(--panel-2); border: 1px solid var(--border);
+    padding: 1px 5px; border-radius: 5px; color: #d0d6e0;
+  }
+
+  /* ---- tables ---- */
+  .table-scroll {
+    overflow-x: auto; border: 1px solid var(--border); border-radius: 10px;
+    box-shadow: var(--shadow);
+  }
+  table { width: 100%; border-collapse: collapse; font-size: 14px; }
+  .table-scroll table { margin: 0; }
+  th, td { text-align: left; padding: 11px 15px; border-bottom: 1px solid var(--border); vertical-align: top; }
+  tbody tr:last-child td { border-bottom: 0; }
+  th {
+    color: var(--muted); font-weight: 590; font-size: 11.5px;
+    text-transform: uppercase; letter-spacing: 0.06em;
+    background: var(--panel);
+    position: sticky; top: 0;
+  }
+  tbody tr { transition: background 0.15s ease; }
+  tbody tr:hover { background: rgba(113, 112, 255, 0.045); }
+  td code { font-family: var(--mono); font-size: 12.8px; color: #d0d6e0; }
+
+  .method { display: inline-block; font-family: var(--mono); font-size: 11.5px; font-weight: 700; padding: 3px 8px; border-radius: 6px; letter-spacing: 0.03em; }
+  .method.post { background: rgba(113, 112, 255, 0.14); color: #a5a2ff; border: 1px solid rgba(113, 112, 255, 0.28); }
+  .method.get  { background: rgba(104, 204, 88, 0.12); color: #68cc58; border: 1px solid rgba(104, 204, 88, 0.28); }
+  .method.del  { background: rgba(242, 85, 90, 0.12); color: #f2555a; border: 1px solid rgba(242, 85, 90, 0.28); }
+
+  .callout {
+    border-left: 3px solid var(--amber);
+    background: linear-gradient(90deg, rgba(212, 177, 68, 0.08), rgba(212, 177, 68, 0.02));
+    padding: 14px 16px; border-radius: 0 10px 10px 0; color: #e8dcb4; font-size: 14px;
+  }
+  .callout.warn { border-color: var(--red); background: rgba(242, 85, 90, 0.07); color: #ffd9db; }
+
+  ul.checks { list-style: none; padding-left: 0; margin: 0; }
+  ul.checks li { position: relative; padding-left: 24px; margin: 9px 0; color: var(--muted); font-size: 14.5px; }
+  ul.checks li::before { content: "\25B9"; position: absolute; left: 4px; color: var(--accent); }
+  ul.checks li .k { font-family: var(--mono); color: var(--accent); font-size: 12.5px; }
+
+  footer {
+    position: relative; z-index: 1;
+    border-top: 1px solid var(--border); padding: 30px 0 52px;
+    color: var(--muted); font-size: 13.5px;
+  }
+  footer .wrap { display: flex; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
+
+  .flow { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; font-family: var(--mono); font-size: 12.8px; }
+  .flow .node {
+    border: 1px solid var(--border-strong); background: var(--panel);
+    padding: 8px 13px; border-radius: 8px; transition: border-color 0.2s ease, color 0.2s ease;
+  }
+  .flow .node:hover { border-color: var(--accent); color: #fff; }
+  .flow .arrow { color: var(--accent); }
+
+  /* ---- mermaid ---- */
+  .diagram {
+    background: var(--panel);
+    border: 1px solid var(--border); border-radius: 10px;
+    padding: 18px; margin: 14px 0; overflow-x: auto; box-shadow: var(--shadow);
+    text-align: center;
+  }
+  pre.mermaid {
+    background: transparent; border: 0; box-shadow: none; padding: 0; margin: 0;
+    color: var(--muted); font-family: var(--mono); font-size: 13px;
+  }
+  pre.mermaid svg { max-width: 100%; height: auto; }
+  .diagram pre.mermaid { text-align: center; }
+
+  /* ---- motion ---- */
+  .reveal { opacity: 0; transform: translateY(14px); transition: opacity 0.6s ease, transform 0.6s ease; }
+  .reveal.in { opacity: 1; transform: none; }
+
+  @media (prefers-reduced-motion: reduce) {
+    html { scroll-behavior: auto; }
+    .reveal { opacity: 1; transform: none; transition: none; }
+    .card, .flow .node, nav.top-nav a::after, .copy { transition: none; }
+  }
+
+  @media (max-width: 820px) {
+    .top-inner { flex-wrap: wrap; gap: 8px; }
+    nav.top-nav {
+      width: 100%; gap: 16px; overflow-x: auto; padding-bottom: 3px;
+      -webkit-overflow-scrolling: touch;
+    }
+    .hero { padding-top: 56px; }
+    .hero::after { display: none; }
+  }
+</style>
+</head>
+<body>
+
+<div class="bg-grid" aria-hidden="true"></div>
+<div class="progress" id="progress" aria-hidden="true"></div>
+
+<header class="top">
+  <div class="top-inner">
+    <div class="brand"><span class="mark"></span>archi-server</div>
+    <nav class="top-nav">
+      <a href="#overview">Overview</a>
+      <a href="#quickstart">Quickstart</a>
+      <a href="#api">API</a>
+      <a href="#repos">Repositories</a>
+      <a href="#config">Configuration</a>
+      <a href="#plugins">Plugins</a>
+      <a href="#notes">Notes</a>
+    </nav>
+  </div>
+</header>
+
+<main class="wrap">
+
+  <div class="hero">
+    <span class="eyebrow">Headless Archi &middot; REST</span>
+    <h1 class="title">Query Archi models on demand.</h1>
+    <p class="lede">
+      A small TypeScript + Node.js service that drives <strong>Archi&nbsp;5.6</strong> in headless
+      mode with the <strong>jArchi</strong> scripting and <strong>coArchi</strong> collaboration
+      plugins, and returns the script output as JSON.
+    </p>
+    <div class="pills">
+      <span class="pill"><b>Archi</b> 5.6.0</span>
+      <span class="pill"><b>jArchi</b> 1.11.0</span>
+      <span class="pill"><b>coArchi</b> 0.9.7</span>
+    </div>
+  </div>
+
+  <section id="overview">
+    <h2><span class="hash">#</span> Overview</h2>
+    <p class="sub">One HTTP call, one isolated Archi run.</p>
+
+    <div class="flow">
+      <span class="node">POST /api/run</span>
+      <span class="arrow">-&gt;</span>
+      <span class="node">queue (semaphore)</span>
+      <span class="arrow">-&gt;</span>
+      <span class="node">Archi ACLI + jArchi + coArchi</span>
+      <span class="arrow">-&gt;</span>
+      <span class="node">stdout + result file</span>
+      <span class="arrow">-&gt;</span>
+      <span class="node">JSON response</span>
+    </div>
+
+    <div class="grid cols-3" style="margin-top:22px">
+      <div class="card">
+        <h3>Isolated runs</h3>
+        <p>Each request gets its own scratch directory and workspace, so concurrent runs never share state.</p>
+      </div>
+      <div class="card">
+        <h3>Bounded resources</h3>
+        <p>A semaphore caps parallel JVMs and a hard timeout kills runaway scripts.</p>
+      </div>
+      <div class="card">
+        <h3>Git-backed repos</h3>
+        <p>Models and scripts are cloned and synced as sub-folders of <span class="k">/models</span> and <span class="k">/scripts</span>, over HTTPS with an access token.</p>
+      </div>
+    </div>
+
+    <div class="diagram">
+      <pre class="mermaid">
+flowchart LR
+  client(["API client"]) -->|"POST /api/run"| server["archi-server"]
+  client -->|"repo CRUD + sync"| server
+  server -->|"spawn"| archi["Archi ACLI (jArchi + coArchi)"]
+  archi -->|"stdout + resultFile"| server
+  server -->|"JSON"| client
+
+  subgraph volumes ["Mounted volumes"]
+    direction TB
+    scripts["/scripts - script repos (git)"]
+    models["/models - model repos + archimate files"]
+  end
+  server -.->|"clone / fetch / pull"| scripts
+  server -.->|"clone / fetch / pull"| models
+      </pre>
+    </div>
+  </section>
+
+  <section id="quickstart">
+    <h2><span class="hash">#</span> Quickstart</h2>
+    <p class="sub">Fetch the binaries, build once, run anywhere.</p>
+
+    <h3>1. Fetch Archi and coArchi</h3>
+    <pre><span class="c"># downloads into vendor/ (git-ignored)</span>
+scripts/fetch-archi.sh</pre>
+    <p class="sub" style="margin-bottom:6px">
+      jArchi's binary is not publicly downloadable. Drop the provided
+      <code class="inline">*.archiplugin</code> into <code class="inline">vendor/plugins/</code>,
+      set <span class="k">JARCHI_URL</span>, or build it from source (see below).
+    </p>
+
+    <h3>2. Build and run with Docker Compose</h3>
+    <pre>docker compose up --build</pre>
+
+    <h3>3. Call the API</h3>
+    <pre>curl -s http://localhost:3000/api/run \
+  -H <span class="s">'content-type: application/json'</span> \
+  -d <span class="s">'{
+    "correlationId": "demo-1",
+    "model": "my-model",
+    "script": "archiServer.setResult({ elements: $(\".archimate-element\").size() });"
+  }'</span></pre>
+  </section>
+
+  <section id="api">
+    <h2><span class="hash">#</span> API</h2>
+    <p class="sub">Run a script, or manage the git repos behind it.</p>
+
+    <div class="card" style="margin-bottom:16px">
+      <h3><span class="method post">POST</span> <span class="k">/api/run</span></h3>
+      <p>Execute a jArchi script against a model and return its output.</p>
+    </div>
+
+    <h3>Request</h3>
+    <pre>{
+  <span class="k">"correlationId"</span>: <span class="s">"string"</span>,
+  <span class="k">"script"</span>:        <span class="s">"jArchi script source"</span>,
+  <span class="k">"model"</span>:         <span class="s">"path inside the /models volume"</span>
+}</pre>
+
+    <div class="table-scroll">
+      <table>
+        <thead><tr><th>Field</th><th>Type</th><th>Description</th></tr></thead>
+        <tbody>
+          <tr><td><code>correlationId</code></td><td>string</td><td>Echoed back in the response.</td></tr>
+          <tr><td><code>script</code></td><td>string</td><td>jArchi source, run with <code>--script.runScript</code>.</td></tr>
+          <tr><td><code>model</code></td><td>string</td><td>Resolved inside <code>/models</code>. A directory loads as a coArchi repository (<code>--modelrepository.loadModel</code>); a file loads with <code>--loadModel</code>. Path traversal is rejected.</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <h3>Response</h3>
+    <pre>{
+  <span class="k">"correlationId"</span>: <span class="s">"demo-1"</span>,
+  <span class="k">"stdout"</span>:        <span class="s">"..."</span>,
+  <span class="k">"stderr"</span>:        <span class="s">"..."</span>,
+  <span class="k">"exitCode"</span>:      <span class="s">0</span>,
+  <span class="k">"result"</span>: {
+    <span class="k">"file"</span>:      <span class="s">"/var/archi/runs/run-xxxx/result.json"</span>,
+    <span class="k">"encoding"</span>:  <span class="s">"json"</span>,
+    <span class="k">"content"</span>:   { <span class="k">"any"</span>: <span class="s">"parsed JSON, text, or base64"</span> },
+    <span class="k">"size"</span>:      <span class="s">42</span>,
+    <span class="k">"truncated"</span>: <span class="s">false</span>
+  }
+}</pre>
+    <p class="sub">
+      <code class="inline">result</code> is <code class="inline">null</code> when a script does not
+      advertise a result file. A run that exceeds the timeout returns <code class="inline">504</code>
+      with the same shape.
+    </p>
+
+    <div class="card" style="margin-top:8px">
+      <h3><span class="method get">GET</span> <span class="k">/health</span></h3>
+      <p>Returns <code class="inline">{ "status": "ok" }</code>. Used by the container healthcheck.</p>
+    </div>
+
+    <div class="card" style="margin-top:12px">
+      <h3><span class="method get">GET</span> <span class="k">/openapi.json</span></h3>
+      <p>OpenAPI 3.0 document describing every endpoint. Point your own Swagger UI or client generator at it.</p>
+    </div>
+
+    <h3>Result convention</h3>
+    <p class="sub">
+      A script advertises a result file by printing a JSON object with a
+      <code class="inline">resultFile</code> key (aliases: <code class="inline">result_file</code>,
+      <code class="inline">result</code>). Relative paths resolve against the run directory.
+    </p>
+    <p class="sub">Every script gets a small prelude:</p>
+    <pre><span class="k">archiServer</span> = {
+  correlationId: <span class="s">"demo-1"</span>,
+  runDir:        <span class="s">"/var/archi/runs/run-xxxx"</span>,
+  resultFile:    <span class="s">"/var/archi/runs/run-xxxx/result.json"</span>,
+  <span class="c">// writes result.json and prints { "resultFile": ... }</span>
+  setResult: <span class="k">function</span> (value) { /* ... */ }
+};</pre>
+
+    <div class="diagram">
+      <pre class="mermaid">
+sequenceDiagram
+  autonumber
+  participant C as Client
+  participant S as archi-server
+  participant A as Archi ACLI
+  C->>S: POST /api/run
+  S->>S: validate + acquire semaphore
+  S->>S: write script.ajs (+ prelude)
+  S->>A: runScript on --loadModel / --modelrepository.loadModel
+  A-->>S: stdout, stderr, exit code
+  A->>S: resultFile printed to stdout
+  S->>S: read + decode result file
+  S-->>C: 200 {correlationId, stdout, stderr, exitCode, result}
+      </pre>
+    </div>
+  </section>
+
+  <section id="repos">
+    <h2><span class="hash">#</span> Repositories</h2>
+    <p class="sub">Models and scripts are git-managed sub-folders of the mounted volumes. Add over HTTPS with an access token, sync, and remove by id.</p>
+
+    <div class="diagram">
+      <pre class="mermaid">
+flowchart LR
+  add["POST /api/models clone url"] --> ready["/models/{id} git repo"]
+  ready --> run["POST /api/run model = id"]
+  ready --> sync["POST /api/models/:id/sync fetch + ff-only"]
+  sync --> ready
+  ready --> del["DELETE /api/models/:id"]
+      </pre>
+    </div>
+
+    <div class="grid cols-2">
+      <div>
+        <h3>Models</h3>
+        <div class="table-scroll">
+          <table>
+            <thead><tr><th>Method</th><th>Path</th></tr></thead>
+            <tbody>
+              <tr><td><span class="method get">GET</span></td><td><code>/api/models</code></td></tr>
+              <tr><td><span class="method post">POST</span></td><td><code>/api/models</code></td></tr>
+              <tr><td><span class="method post">POST</span></td><td><code>/api/models/:id/sync</code></td></tr>
+              <tr><td><span class="method del">DELETE</span></td><td><code>/api/models/:id</code></td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+      <div>
+        <h3>Scripts</h3>
+        <div class="table-scroll">
+          <table>
+            <thead><tr><th>Method</th><th>Path</th></tr></thead>
+            <tbody>
+              <tr><td><span class="method get">GET</span></td><td><code>/api/scripts</code></td></tr>
+              <tr><td><span class="method post">POST</span></td><td><code>/api/scripts</code></td></tr>
+              <tr><td><span class="method post">POST</span></td><td><code>/api/scripts/:id/sync</code></td></tr>
+              <tr><td><span class="method del">DELETE</span></td><td><code>/api/scripts/:id</code></td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <h3>Add a repository</h3>
+    <pre>curl -s http://localhost:3000/api/models \
+  -H <span class="s">'content-type: application/json'</span> \
+  -d <span class="s">'{
+    "url": "https://git.example.com/org/my-model.git",
+    "id": "my-model",
+    "branch": "main",
+    "username": "oauth2",
+    "token": "glpat-xxxxxxxx"
+  }'</span></pre>
+
+    <div class="table-scroll">
+      <table>
+        <thead><tr><th>Field</th><th>Required</th><th>Description</th></tr></thead>
+        <tbody>
+          <tr><td><code>url</code></td><td>yes</td><td><code>http(s)://</code> git URL. A token may be embedded (<code>https://oauth2:TOKEN@host/org/repo.git</code>). SSH is not supported.</td></tr>
+          <tr><td><code>id</code></td><td>no</td><td>Folder name. Derived from the URL's last segment. Must match <code>[A-Za-z0-9][A-Za-z0-9._-]*</code>.</td></tr>
+          <tr><td><code>branch</code></td><td>no</td><td>Branch to check out; defaults to the remote HEAD.</td></tr>
+          <tr><td><code>username</code></td><td>no</td><td>Defaults to <code>oauth2</code> when only a token is given (works for GitHub and GitLab).</td></tr>
+          <tr><td><code>token</code></td><td>no</td><td>Access token, sent as the password.</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <p class="sub" style="margin-top:14px">Returns <code class="inline">201</code> with the repository object, or <code class="inline">409</code> if the id exists:</p>
+    <pre>{
+  <span class="k">"id"</span>:      <span class="s">"my-model"</span>,
+  <span class="k">"kind"</span>:    <span class="s">"model"</span>,
+  <span class="k">"path"</span>:    <span class="s">"/models/my-model"</span>,
+  <span class="k">"url"</span>:     <span class="s">"https://git.example.com/org/my-model.git"</span>,
+  <span class="k">"branch"</span>:  <span class="s">"main"</span>,
+  <span class="k">"commit"</span>:  <span class="s">"7fd1a60b01f9"</span>,
+  <span class="k">"subject"</span>: <span class="s">"Merge pull request #6"</span>,
+  <span class="k">"date"</span>:    <span class="s">"2012-03-06T15:06:50-08:00"</span>,
+  <span class="k">"dirty"</span>:   <span class="s">false</span>
+}</pre>
+
+    <h3>Sync &amp; remove</h3>
+    <ul class="checks">
+      <li><span class="k">POST /:id/sync</span>: <code class="inline">git fetch --prune</code> then a fast-forward-only merge. Returns the object plus <code class="inline">updated</code> and <code class="inline">previousCommit</code>. Non-fast-forward local commits are refused.</li>
+      <li><span class="k">DELETE /:id</span>: deletes the folder and returns <code class="inline">204</code>.</li>
+    </ul>
+
+    <div class="callout" style="margin-top:18px">
+      Tokens are never written to <code class="inline">.git/config</code>: the remote URL is stored sanitized and the token lives in <code class="inline">&lt;repo&gt;/.git/archi-server-credentials.json</code> (mode <code class="inline">0600</code>) so sync stays non-interactive. git runs through an askpass helper, so the token never appears in process arguments.
+    </div>
+
+    <div class="table-scroll" style="margin-top:18px">
+      <table>
+        <thead><tr><th>Status</th><th>When</th></tr></thead>
+        <tbody>
+          <tr><td><code>400</code></td><td>Invalid body, non-http(s) URL, bad id or branch.</td></tr>
+          <tr><td><code>404</code></td><td>Unknown repository id.</td></tr>
+          <tr><td><code>409</code></td><td>Id exists, folder is not a git repo, or detached HEAD.</td></tr>
+          <tr><td><code>502</code></td><td>git failed (its <code>stderr</code> is returned in <code>details</code>).</td></tr>
+          <tr><td><code>504</code></td><td>git exceeded <code>ARCHI_GIT_TIMEOUT_MS</code>.</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section id="config">
+    <h2><span class="hash">#</span> Configuration</h2>
+    <p class="sub">Everything is environment driven.</p>
+    <div class="table-scroll">
+      <table>
+        <thead><tr><th>Variable</th><th>Default</th><th>Description</th></tr></thead>
+        <tbody>
+          <tr><td><code>PORT</code></td><td><code>3000</code></td><td>HTTP port.</td></tr>
+          <tr><td><code>HOST</code></td><td><code>0.0.0.0</code></td><td>Bind address.</td></tr>
+          <tr><td><code>ARCHI_HOME</code></td><td><code>/opt/archi</code></td><td>Archi install root.</td></tr>
+          <tr><td><code>ARCHI_BINARY</code></td><td><code>$ARCHI_HOME/Archi</code></td><td>Launcher path.</td></tr>
+          <tr><td><code>ARCHI_SCRIPTS_DIR</code></td><td><code>/scripts</code></td><td>jArchi user scripts volume.</td></tr>
+          <tr><td><code>ARCHI_MODELS_DIR</code></td><td><code>/models</code></td><td>Model volume.</td></tr>
+          <tr><td><code>ARCHI_RUNS_DIR</code></td><td><code>/var/archi/runs</code></td><td>Per-run scratch directory.</td></tr>
+          <tr><td><code>ARCHI_XMS</code></td><td><code>256m</code></td><td>JVM initial heap (written into <code>Archi.ini</code>).</td></tr>
+          <tr><td><code>ARCHI_XMX</code></td><td><code>2g</code></td><td>JVM max heap (written into <code>Archi.ini</code>).</td></tr>
+          <tr><td><code>ARCHI_TIMEOUT_MS</code></td><td><code>120000</code></td><td>Kill a run after this long.</td></tr>
+          <tr><td><code>ARCHI_MAX_CONCURRENCY</code></td><td><code>1</code></td><td>Parallel Archi runs (each is a JVM + display).</td></tr>
+          <tr><td><code>ARCHI_RESULT_MAX_BYTES</code></td><td><code>26214400</code></td><td>Max result file returned.</td></tr>
+          <tr><td><code>ARCHI_KEEP_RUN_DIRS</code></td><td><code>false</code></td><td>Keep per-run directories for debugging.</td></tr>
+          <tr><td><code>API_KEY</code></td><td><em>unset</em></td><td>When set, requests must send <code>x-api-key</code>.</td></tr>
+          <tr><td><code>LOG_LEVEL</code></td><td><code>info</code></td><td><code>debug</code> | <code>info</code> | <code>warn</code> | <code>error</code>.</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="grid cols-2" style="margin-top:18px">
+      <div class="card">
+        <h3>Volumes</h3>
+        <p><span class="k">/scripts</span> &rarr; jArchi user scripts folder (git-managed script repos).<br>
+           <span class="k">/models</span> &rarr; coArchi repositories and/or <span class="k">.archimate</span> files.</p>
+      </div>
+      <div class="card">
+        <h3>Heap handling</h3>
+        <p>The entrypoint injects <span class="k">-Xms</span>/<span class="k">-Xmx</span> into
+           <span class="k">Archi.ini</span> at start, so no JVM flags leak onto stderr.</p>
+      </div>
+    </div>
+  </section>
+
+  <section id="plugins">
+    <h2><span class="hash">#</span> Plugins</h2>
+    <p class="sub">Why these exact versions, and how to build jArchi yourself.</p>
+
+    <div class="table-scroll">
+      <table>
+        <thead><tr><th>Component</th><th>Version</th><th>Requirement</th><th>Reason</th></tr></thead>
+        <tbody>
+          <tr><td>Archi</td><td>5.6.0</td><td>JRE 21</td><td>Requested base.</td></tr>
+          <tr><td>jArchi</td><td><strong>1.11.0</strong></td><td>Archi &ge; 5.5.0</td><td>jArchi <strong>1.12 requires Archi &ge; 5.8</strong>, so it cannot run on 5.6. 1.11.0 ships the same GraalVM 24.1.2 JS engine.</td></tr>
+          <tr><td>coArchi</td><td>0.9.7</td><td>Archi &ge; 4.9.0</td><td>Latest 0.9.x, compatible with 5.6.</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="callout" style="margin-top:18px">
+      If jArchi 1.12 is mandatory, move the base image to Archi 5.8+ (coArchi 0.9.7 still fits).
+    </div>
+
+    <h3>Build jArchi from source</h3>
+    <pre><span class="c"># requires git + maven; compiles tag v1.11.0 against the local Archi install</span>
+scripts/build-plugins.sh</pre>
+    <ul class="checks">
+      <li>Publishes the Archi install as a p2 repository used as the Tycho target platform.</li>
+      <li>Produces <span class="k">vendor/plugins/com.archimatetool.script*.jar</span>.</li>
+    </ul>
+  </section>
+
+  <section id="notes">
+    <h2><span class="hash">#</span> Notes &amp; limitations</h2>
+    <ul class="checks">
+      <li>Each run starts a fresh JVM. Keep <span class="k">ARCHI_MAX_CONCURRENCY</span> low.</li>
+      <li>The image runs as non-root user <span class="k">archi</span> (uid 1001, override with <span class="k">--build-arg ARCHI_UID=$(id -u)</span>). <span class="k">/models</span> and <span class="k">/scripts</span> must be writable by that uid so repositories can be cloned and synced.</li>
+      <li>Repository auth is HTTPS + access token only (no SSH). Tokens live under <span class="k">&lt;repo&gt;/.git/</span> with mode <span class="k">0600</span>.</li>
+      <li>CI typechecks and runs the unit tests on every push and PR; the image is published to GHCR only on <span class="k">v*</span> tag commits.</li>
+      <li>Directory models must already be coArchi/GRAFICO repositories (contain <span class="k">model/folder.xml</span>); otherwise coArchi reports an error in <span class="k">stderr</span>.</li>
+      <li>Archi writes a harmless <span class="k">SLF4J(W): No SLF4J providers were found.</span> line to <span class="k">stderr</span>. Silence it with <span class="k">JAVA_TOOL_OPTIONS=-Dslf4j.internal.verbosity=ERROR</span> if desired.</li>
+    </ul>
+  </section>
+
+</main>
+
+<footer>
+  <div class="wrap">
+    <span>&copy; 2026 <a href="https://giwi.fr" target="_blank" rel="noopener">giwi.fr</a> &middot; archi-server</span>
+    <span>
+      <a href="https://github.com/Giwi/archi-jarchi-runner-api/blob/main/LICENSE" target="_blank" rel="noopener">GPL-3.0 license</a>
+      &middot;
+      <a href="https://github.com/Giwi/archi-jarchi-runner-api" target="_blank" rel="noopener">GitHub</a>
+      &middot; Archi 5.6 &middot; jArchi 1.11 &middot; coArchi 0.9.7
+    </span>
+  </div>
+</footer>
+
+<script>
+(function () {
+  "use strict";
+
+  // Attach a copy button to every code block (skip diagrams).
+  document.querySelectorAll("pre:not(.mermaid)").forEach(function (pre) {
+    if (pre.parentElement && pre.parentElement.classList.contains("code-wrap")) return;
+    var wrap = document.createElement("div");
+    wrap.className = "code-wrap";
+    pre.parentNode.insertBefore(wrap, pre);
+    wrap.appendChild(pre);
+
+    var btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "copy";
+    btn.textContent = "copy";
+    btn.addEventListener("click", function () {
+      var text = pre.innerText;
+      var done = function () {
+        btn.textContent = "copied";
+        btn.classList.add("ok");
+        setTimeout(function () {
+          btn.textContent = "copy";
+          btn.classList.remove("ok");
+        }, 1400);
+      };
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(text).then(done, done);
+      } else {
+        var ta = document.createElement("textarea");
+        ta.value = text;
+        ta.style.position = "fixed";
+        ta.style.opacity = "0";
+        document.body.appendChild(ta);
+        ta.select();
+        try { document.execCommand("copy"); } catch (e) {}
+        document.body.removeChild(ta);
+        done();
+      }
+    });
+    wrap.appendChild(btn);
+  });
+
+  var reduce = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+  // Active section in the top nav.
+  var links = Array.prototype.slice.call(document.querySelectorAll("nav.top-nav a"));
+  var byId = {};
+  links.forEach(function (a) { byId[a.getAttribute("href").slice(1)] = a; });
+  if ("IntersectionObserver" in window && links.length) {
+    var navObs = new IntersectionObserver(function (entries) {
+      entries.forEach(function (e) {
+        if (!e.isIntersecting) return;
+        links.forEach(function (l) { l.classList.remove("active"); });
+        if (byId[e.target.id]) byId[e.target.id].classList.add("active");
+      });
+    }, { rootMargin: "-45% 0px -50% 0px", threshold: 0 });
+    document.querySelectorAll("section[id]").forEach(function (s) { navObs.observe(s); });
+  }
+
+  // Reveal-on-scroll (skipped when reduced motion is requested).
+  if (!reduce && "IntersectionObserver" in window) {
+    var revObs = new IntersectionObserver(function (entries) {
+      entries.forEach(function (e) {
+        if (e.isIntersecting) { e.target.classList.add("in"); revObs.unobserve(e.target); }
+      });
+    }, { rootMargin: "0px 0px -8% 0px" });
+    document.querySelectorAll("section, .hero, .card").forEach(function (el) {
+      if (el.closest(".card")) return;
+      el.classList.add("reveal");
+      revObs.observe(el);
+    });
+  }
+
+  // Scroll progress bar.
+  var prog = document.getElementById("progress");
+  var onScroll = function () {
+    var h = document.documentElement;
+    var max = h.scrollHeight - h.clientHeight;
+    prog.style.width = (max > 0 ? (h.scrollTop / max) * 100 : 0) + "%";
+  };
+  window.addEventListener("scroll", onScroll, { passive: true });
+  window.addEventListener("resize", onScroll, { passive: true });
+  onScroll();
+})();
+</script>
+
+<script type="module">
+  import mermaid from "https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs";
+  mermaid.initialize({
+    startOnLoad: true,
+    securityLevel: "strict",
+    theme: "dark",
+    fontFamily: "Inter, ui-sans-serif, system-ui, sans-serif",
+    themeVariables: {
+      background: "#0f1011",
+      primaryColor: "#141516",
+      primaryTextColor: "#f7f8f8",
+      primaryBorderColor: "rgba(255,255,255,0.14)",
+      lineColor: "#7170ff",
+      secondaryColor: "#141516",
+      tertiaryColor: "#0f1011",
+      clusterBkg: "#0f1011",
+      clusterBorder: "rgba(255,255,255,0.10)",
+      edgeLabelBackground: "#0f1011",
+      fontSize: "13px"
+    }
+  });
+</script>
+
+</body>
+</html>

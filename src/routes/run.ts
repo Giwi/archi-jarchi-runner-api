@@ -1,0 +1,51 @@
+import { Router, type NextFunction, type Request, type Response } from 'express';
+
+import { runArchi } from '../archi/runner.js';
+import { config } from '../config.js';
+import { HttpError } from '../errors.js';
+import { log } from '../logger.js';
+import { Semaphore } from '../queue.js';
+import type { RunRequestBody } from '../types.js';
+
+const limiter = new Semaphore(config.maxConcurrency);
+
+function parseBody(value: unknown): RunRequestBody {
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) {
+    throw new HttpError(400, 'request body must be a JSON object');
+  }
+  const { correlationId, script, model } = value as Record<string, unknown>;
+
+  if (typeof correlationId !== 'string' || correlationId.trim() === '') {
+    throw new HttpError(400, 'correlationId must be a non-empty string');
+  }
+  if (typeof script !== 'string' || script.trim() === '') {
+    throw new HttpError(400, 'script must be a non-empty string');
+  }
+  if (typeof model !== 'string' || model.trim() === '') {
+    throw new HttpError(400, 'model must be a non-empty string');
+  }
+
+  return { correlationId, script, model };
+}
+
+export const runRouter = Router();
+
+runRouter.post('/run', async (req: Request, res: Response, next: NextFunction) => {
+  let release: (() => void) | undefined;
+  try {
+    const body = parseBody(req.body);
+
+    release = await limiter.acquire();
+    const result = await runArchi(body);
+
+    const { timedOut, ...payload } = result;
+    if (timedOut) {
+      log.warn('run timed out', { correlationId: body.correlationId });
+    }
+    res.status(timedOut ? 504 : 200).json(payload);
+  } catch (error) {
+    next(error);
+  } finally {
+    release?.();
+  }
+});

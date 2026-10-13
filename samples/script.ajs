@@ -1,0 +1,10 @@
+// Sample jArchi script for POST /api/run
+console.log("correlationId=" + archiServer.correlationId);
+console.log("model=" + (model ? model.name : "(none)"));
+
+var elementCount = $(".archimate-element").size();
+
+archiServer.setResult({
+  modelName: model ? model.name : null,
+  elementCount: elementCount
+});

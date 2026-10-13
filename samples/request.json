@@ -1,0 +1,5 @@
+{
+  "correlationId": "demo-1",
+  "script": "console.log('hello from jArchi'); archiServer.setResult({ ok: true, modelName: model ? model.name : null });",
+  "model": "my-model"
+}

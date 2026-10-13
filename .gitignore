@@ -1,0 +1,19 @@
+node_modules/
+dist/
+*.log
+
+# Downloaded / provided binaries (see scripts/fetch-archi.sh)
+vendor/archi/*
+!vendor/archi/.gitkeep
+vendor/cache/
+vendor/plugins/*
+!vendor/plugins/.gitkeep
+
+# Plugin build workspace
+build/plugins/.work/
+build/plugins/jarchi/
+
+# Local compose data
+data/
+
+.DS_Store
