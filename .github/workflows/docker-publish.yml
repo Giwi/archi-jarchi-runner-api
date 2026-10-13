@@ -39,6 +39,10 @@ jobs:
       - name: Unit tests
         run: npm run test:ci
 
+      - name: Test summary
+        if: always()
+        run: node scripts/junit-summary.mjs test-results/junit.xml
+
       - name: Publish test report
         if: always()
         continue-on-error: true
