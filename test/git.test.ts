@@ -23,6 +23,18 @@ function git(cwd: string, ...args: string[]): string {
   return execFileSync('git', args, { cwd, env: ENV, encoding: 'utf8' }).trim();
 }
 
+/** The git-backed suite needs a `git` binary; skip (not cancel) when absent. */
+const GIT_AVAILABLE = (() => {
+  try {
+    execFileSync('git', ['--version'], { stdio: 'ignore' });
+    return true;
+  } catch {
+    return false;
+  }
+})();
+
+const describeWithGit = GIT_AVAILABLE ? describe : describe.skip;
+
 /** Minimal smart-HTTP git server backed by `git http-backend` (CGI). */
 function createGitServer(projectRoot: string): Promise<{ server: Server; url: string }> {
   const server = createServer((req: IncomingMessage, res) => {
@@ -95,7 +107,7 @@ describe('sanitizeId', () => {
   });
 });
 
-describe('repository management (local smart-HTTP git)', () => {
+describeWithGit('repository management (local smart-HTTP git)', () => {
   let root: string;
   let modelsDir: string;
   let projectRoot: string;
@@ -111,8 +123,11 @@ describe('repository management (local smart-HTTP git)', () => {
     await mkdir(modelsDir, { recursive: true });
     await mkdir(projectRoot, { recursive: true });
 
-    // Upstream bare repository with one commit.
-    git(projectRoot, 'init', '--bare', '-q', 'upstream.git');
+    // Upstream bare repository with one commit on `main` (independent of the
+    // host's init.defaultBranch, which is `master` on some git versions).
+    git(projectRoot, 'init', '--bare', '-q', '-b', 'main', 'upstream.git');
+    const bareDir = path.join(projectRoot, 'upstream.git');
+    git(bareDir, 'symbolic-ref', 'HEAD', 'refs/heads/main');
     await mkdir(workDir, { recursive: true });
     git(workDir, 'init', '-q', '-b', 'main');
     await writeFile(path.join(workDir, 'file.txt'), 'hello\n');
@@ -186,7 +201,7 @@ describe('repository management (local smart-HTTP git)', () => {
 
   test('syncRepo refuses a detached HEAD', async () => {
     const target = path.join(modelsDir, 'demo');
-    git(target, 'checkout', '-q', '--detach', 'HEAD');
+    git(target, 'checkout', '-q', '--detach');
     await assert.rejects(
       syncRepo(modelsDir, 'model', 'demo'),
       (error: unknown) => error instanceof HttpError && error.status === 409,
