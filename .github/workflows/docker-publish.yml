@@ -16,6 +16,10 @@ jobs:
   test:
     name: Typecheck and unit tests
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      checks: write
+      pull-requests: write
     steps:
       - name: Checkout
         uses: actions/checkout@v5
@@ -33,7 +37,25 @@ jobs:
         run: npm run typecheck
 
       - name: Unit tests
-        run: npm test
+        run: npm run test:ci
+
+      - name: Publish test report
+        if: always()
+        continue-on-error: true
+        uses: dorny/test-reporter@v1
+        with:
+          name: Unit tests
+          path: test-results/junit.xml
+          reporter: java-junit
+          fail-on-error: false
+
+      - name: Upload test report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: unit-test-report
+          path: test-results/junit.xml
+          if-no-files-found: ignore
 
   docker:
     name: Build image (publish on tags)

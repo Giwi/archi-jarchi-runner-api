@@ -1,5 +1,6 @@
 node_modules/
 dist/
+test-results/
 *.log
 
 # Downloaded / provided binaries (see scripts/fetch-archi.sh)

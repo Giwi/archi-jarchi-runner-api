@@ -354,6 +354,7 @@ rotate it. Non-fast-forward local commits are refused (the merge only advances).
 npm ci
 npm run typecheck   # tsc, checks src + test (tsconfig.test.json)
 npm test            # node --test via tsx (no external test deps)
+npm run test:ci     # same, plus test-results/junit.xml (JUnit XML)
 npm run build       # emit dist/
 ```
 
@@ -366,9 +367,10 @@ Unit tests live in `test/` and use Node's built-in runner:
   auth, body validation and the repository routes.
 
 CI (`.github/workflows/docker-publish.yml`) typechecks and runs the tests on
-every push and pull request, then builds the Docker image. The image is
-**published to GHCR only for tag commits** (`v*`); other runs build without
-pushing.
+every push and pull request, **publishes the JUnit report as a check**
+(`dorny/test-reporter`) and uploads it as an artifact, then builds the Docker
+image. The image is **published to GHCR only for tag commits** (`v*`); other
+runs build without pushing.
 
 ## Notes & limitations
 

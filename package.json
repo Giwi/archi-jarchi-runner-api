@@ -18,6 +18,7 @@
     "start": "node dist/index.js",
     "dev": "tsx watch src/index.ts",
     "test": "node --import tsx --test \"test/*.test.ts\"",
+    "test:ci": "node -e \"require('fs').mkdirSync('test-results',{recursive:true})\" && node --import tsx --test --test-reporter=spec --test-reporter-destination=stdout --test-reporter=junit --test-reporter-destination=test-results/junit.xml \"test/*.test.ts\"",
     "typecheck": "tsc -p tsconfig.test.json"
   },
   "dependencies": {
