@@ -1,4 +1,6 @@
+import path from 'node:path';
 import { open, stat } from 'node:fs/promises';
+
 import type { ResultEncoding, ResultPayload } from '../types.js';
 
 /** Keys a script may use to advertise the file it wants returned. */
@@ -78,6 +80,21 @@ function decodeUtf8(buffer: Buffer): string | null {
   } catch {
     return null;
   }
+}
+
+/**
+ * Resolve an advertised result-file path against the run directory and ensure
+ * it stays inside. Returns the absolute path, or `null` when the path escapes
+ * the run directory. Rejecting escapes prevents a script from exfiltrating
+ * arbitrary files readable by the server process.
+ */
+export function resolveResultPath(runDir: string, advertised: string): string | null {
+  const resolved = path.resolve(runDir, advertised);
+  const relative = path.relative(runDir, resolved);
+  if (relative === '' || relative.startsWith('..') || path.isAbsolute(relative)) {
+    return null;
+  }
+  return resolved;
 }
 
 /**

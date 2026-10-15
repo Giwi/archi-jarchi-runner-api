@@ -2,11 +2,9 @@ import { Router, type NextFunction, type Request, type Response } from 'express'
 
 import { runArchi } from '../archi/runner.js';
 import { HttpError } from '../errors.js';
-import { runLimiter } from '../limiter.js';
+import { acquireRunSlot } from '../limiter.js';
 import { log } from '../logger.js';
 import type { RunRequestBody } from '../types.js';
-
-const limiter = runLimiter;
 
 /**
  * Parse and validate the request body for running a script.
@@ -44,7 +42,7 @@ runRouter.post('/run', async (req: Request, res: Response, next: NextFunction) =
   try {
     const body = parseBody(req.body);
 
-    release = await limiter.acquire();
+    release = await acquireRunSlot();
     const result = await runArchi(body);
 
     const { timedOut, ...payload } = result;

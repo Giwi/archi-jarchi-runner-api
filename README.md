@@ -109,7 +109,8 @@ Request body:
   - a **file** (`.archimate`) is loaded with `--loadModel`.
 - `script` is the jArchi source, executed with `--script.runScript`.
 
-Response (`200`), or `504` on timeout (same shape):
+Response (`200`), `503` when the server is busy (concurrency/queue limit
+reached), or `504` on timeout (same shape):
 
 ```json
 {
@@ -150,7 +151,8 @@ generator at it (no UI is bundled).
 
 A script advertises a result file by printing a JSON object with a
 `resultFile` (or `result_file` / `result`) string. Relative paths resolve
-against the run directory.
+against the run directory. Paths are confined to the run directory: an
+advertised path that escapes it is ignored (logged, and `result` stays `null`).
 
 Every script gets a prelude with a helper and context:
 
@@ -343,6 +345,8 @@ rotate it. Non-fast-forward local commits are refused (the merge only advances).
 | `ARCHI_XMX` | `2g` | JVM max heap (written to `Archi.ini`). |
 | `ARCHI_TIMEOUT_MS` | `120000` | Kill a run after this long. |
 | `ARCHI_MAX_CONCURRENCY` | `1` | Parallel Archi runs (each = JVM + display). |
+| `ARCHI_QUEUE_TIMEOUT_MS` | `120000` | How long a request may wait for a run slot before `503`. |
+| `ARCHI_MAX_QUEUE_LENGTH` | `100` | Max requests allowed to wait for a run slot (`503` beyond this). |
 | `ARCHI_RESULT_MAX_BYTES` | `26214400` | Max result file returned. |
 | `ARCHI_KEEP_RUN_DIRS` | `false` | Keep per-run dirs for debugging. |
 | `API_KEY` | *(unset)* | When set, require `x-api-key`. |

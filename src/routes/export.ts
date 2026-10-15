@@ -2,9 +2,9 @@ import { Router, type NextFunction, type Request, type Response } from 'express'
 
 import { runMermaidExport } from '../archi/mermaid.js';
 import { HttpError } from '../errors.js';
-import { runLimiter } from '../limiter.js';
+import { acquireRunSlot } from '../limiter.js';
 import { log } from '../logger.js';
-import type { MermaidDirection, MermaidExportRequest } from '../types.js';
+import type { MermaidDirection, MermaidExportRequest, MermaidExportResponse } from '../types.js';
 
 const DIRECTIONS: readonly MermaidDirection[] = ['LR', 'RL', 'TB', 'BT'];
 
@@ -72,7 +72,7 @@ exportRouter.post('/export/mermaid', async (req: Request, res: Response, next: N
   try {
     const body = parseMermaidBody(req.body);
 
-    release = await runLimiter.acquire();
+    release = await acquireRunSlot();
     const result = await runMermaidExport(body);
 
     const { timedOut, ...payload } = result;
@@ -89,7 +89,8 @@ exportRouter.post('/export/mermaid', async (req: Request, res: Response, next: N
     if (timedOut) {
       log.warn('mermaid export timed out', { correlationId: body.correlationId });
     }
-    res.status(timedOut ? 504 : 200).json({ ...payload, markdown });
+    const response: MermaidExportResponse = { ...payload, markdown };
+    res.status(timedOut ? 504 : 200).json(response);
   } catch (error) {
     next(error);
   } finally {

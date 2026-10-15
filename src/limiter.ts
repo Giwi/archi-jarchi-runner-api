@@ -1,5 +1,6 @@
 import { config } from './config.js';
-import { Semaphore } from './queue.js';
+import { HttpError } from './errors.js';
+import { QueueFullError, QueueTimeoutError, Semaphore } from './queue.js';
 
 /**
  * Shared concurrency limiter for all Archi operations.
@@ -7,3 +8,21 @@ import { Semaphore } from './queue.js';
  * server-driven exports) according to `ARCHI_MAX_CONCURRENCY`.
  */
 export const runLimiter = new Semaphore(config.maxConcurrency);
+
+/**
+ * Acquire an Archi run slot, translating queue saturation into a 503 so
+ * callers get a clear "try again later" instead of an opaque timeout or hang.
+ */
+export async function acquireRunSlot(): Promise<() => void> {
+  try {
+    return await runLimiter.acquire({
+      timeoutMs: config.queueTimeoutMs,
+      maxQueueLength: config.maxQueueLength,
+    });
+  } catch (error) {
+    if (error instanceof QueueTimeoutError || error instanceof QueueFullError) {
+      throw new HttpError(503, 'server is busy; try again later');
+    }
+    throw error;
+  }
+}

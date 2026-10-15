@@ -1,23 +1,16 @@
-import { spawn } from 'node:child_process';
 import { mkdir, mkdtemp, rm, stat, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 
 import { config } from '../config.js';
 import { HttpError } from '../errors.js';
 import { log } from '../logger.js';
+import { errorMessage, runProcess, type ProcessResult } from '../subprocess.js';
 import type { RunRequestBody, RunResult, RunScriptRequest } from '../types.js';
-import { findResultFile, readResult } from './result.js';
+import { findResultFile, readResult, resolveResultPath } from './result.js';
 
 interface ResolvedModel {
   path: string;
   mode: 'repo' | 'file';
-}
-
-interface SpawnOutcome {
-  stdout: string;
-  stderr: string;
-  exitCode: number | null;
-  timedOut: boolean;
 }
 
 /**
@@ -36,16 +29,14 @@ async function resolveModel(model: string): Promise<ResolvedModel> {
 
   // Ensure the resolved path stays within the models directory
   if (relative === '' || relative.startsWith('..') || path.isAbsolute(relative)) {
-    throw new HttpError(400, 'model must reference a path inside the models volume', {
-      modelsDir: base,
-    });
+    throw new HttpError(400, 'model must reference a path inside the models volume');
   }
 
   let info;
   try {
     info = await stat(absolute);
   } catch {
-    throw new HttpError(404, `model not found: ${trimmed}`, { modelsDir: base });
+    throw new HttpError(404, `model not found: ${trimmed}`);
   }
 
   if (info.isDirectory()) {
@@ -110,57 +101,18 @@ function buildArchiArgs(model: ResolvedModel, scriptPath: string): string[] {
 }
 
 /**
- * Spawn Archi CLI process with the given arguments.
+ * Spawn the Archi CLI process with the given arguments.
  */
-function spawnArchi(args: string[], cwd: string): Promise<SpawnOutcome> {
-  return new Promise<SpawnOutcome>((resolve, reject) => {
-    const child = spawn(config.archiBinary, args, {
+async function spawnArchi(args: string[], cwd: string): Promise<ProcessResult> {
+  try {
+    return await runProcess(config.archiBinary, args, {
       cwd,
       env: { ...process.env, DISPLAY: process.env.DISPLAY ?? ':99' },
-      stdio: ['ignore', 'pipe', 'pipe'],
+      timeoutMs: config.timeoutMs,
     });
-
-    let stdout = '';
-    let stderr = '';
-    let timedOut = false;
-    let settled = false;
-
-    child.stdout.setEncoding('utf8');
-    child.stderr.setEncoding('utf8');
-    child.stdout.on('data', (chunk: string) => {
-      stdout += chunk;
-    });
-    child.stderr.on('data', (chunk: string) => {
-      stderr += chunk;
-    });
-
-    const timer = setTimeout(() => {
-      timedOut = true;
-      child.kill('SIGKILL');
-    }, config.timeoutMs);
-
-    const finish = (outcome: SpawnOutcome) => {
-      if (settled) {
-        return;
-      }
-      settled = true;
-      clearTimeout(timer);
-      resolve(outcome);
-    };
-
-    child.on('error', (error) => {
-      if (settled) {
-        return;
-      }
-      settled = true;
-      clearTimeout(timer);
-      reject(new HttpError(500, `failed to start Archi: ${error.message}`));
-    });
-
-    child.on('close', (code) => {
-      finish({ stdout, stderr, exitCode: code, timedOut });
-    });
-  });
+  } catch (error) {
+    throw new HttpError(500, `failed to start Archi: ${errorMessage(error)}`);
+  }
 }
 
 /**
@@ -191,7 +143,7 @@ export async function runArchiScript(request: RunScriptRequest): Promise<RunResu
   log.debug('starting archi', { correlationId, model, args });
 
   const startedAt = Date.now();
-  let outcome: SpawnOutcome;
+  let outcome: ProcessResult;
   try {
     outcome = await spawnArchi(args, runDir);
   } catch (error) {
@@ -205,16 +157,21 @@ export async function runArchiScript(request: RunScriptRequest): Promise<RunResu
   let result = null;
   const advertised = findResultFile(outcome.stdout);
   if (advertised) {
-    const resultPath = path.isAbsolute(advertised)
-      ? advertised
-      : path.resolve(runDir, advertised);
-    try {
-      result = await readResult(resultPath, config.resultMaxBytes);
-    } catch (error) {
-      log.warn('could not read advertised result file', {
+    const resultPath = resolveResultPath(runDir, advertised);
+    if (resultPath) {
+      try {
+        result = await readResult(resultPath, config.resultMaxBytes);
+      } catch (error) {
+        log.warn('could not read advertised result file', {
+          correlationId,
+          resultFile: resultPath,
+          error: String(error),
+        });
+      }
+    } else {
+      log.warn('result file path escapes the run directory; ignoring', {
         correlationId,
-        resultFile: resultPath,
-        error: String(error),
+        resultFile: advertised,
       });
     }
   }
@@ -223,8 +180,18 @@ export async function runArchiScript(request: RunScriptRequest): Promise<RunResu
     await rm(runDir, { recursive: true, force: true });
   }
 
-  const stderr = outcome.timedOut
-    ? `${outcome.stderr}\n[archi-server] run timed out after ${config.timeoutMs} ms and was killed`
+  const notes: string[] = [];
+  if (outcome.timedOut) {
+    notes.push(`run timed out after ${config.timeoutMs} ms and was killed`);
+  }
+  if (outcome.stdoutTruncated) {
+    notes.push('stdout truncated (output exceeded the buffer limit)');
+  }
+  if (outcome.stderrTruncated) {
+    notes.push('stderr truncated (output exceeded the buffer limit)');
+  }
+  const stderr = notes.length > 0
+    ? `${outcome.stderr}\n${notes.map((note) => `[archi-server] ${note}`).join('\n')}`
     : outcome.stderr;
 
   log.info('archi run finished', {

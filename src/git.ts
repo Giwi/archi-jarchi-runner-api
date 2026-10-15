@@ -1,4 +1,3 @@
-import { spawn } from 'node:child_process';
 import { existsSync } from 'node:fs';
 import { chmod, mkdir, readdir, readFile, rm, stat, writeFile } from 'node:fs/promises';
 import path from 'node:path';
@@ -6,6 +5,7 @@ import path from 'node:path';
 import { config } from './config.js';
 import { HttpError } from './errors.js';
 import { log } from './logger.js';
+import { errorMessage, runProcess, type ProcessResult } from './subprocess.js';
 import type { RepoAddRequest, RepoInfo, RepoKind, RepoSyncRequest } from './types.js';
 
 interface Credentials {
@@ -138,63 +138,32 @@ interface GitOptions {
  * Run a git command, resolving to its stdout or rejecting with an HttpError.
  * Enforces a timeout and never prompts for credentials.
  */
-function runGit(args: string[], options: GitOptions = {}): Promise<string> {
-  return new Promise<string>((resolve, reject) => {
-    const child = spawn(config.gitBinary, args, {
+/**
+ * Run a git command, resolving to its stdout or rejecting with an HttpError.
+ * Enforces a timeout and never prompts for credentials.
+ */
+async function runGit(args: string[], options: GitOptions = {}): Promise<string> {
+  let result: ProcessResult;
+  try {
+    result = await runProcess(config.gitBinary, args, {
       cwd: options.cwd,
       env: gitEnv(options.credentials ?? {}),
-      stdio: ['ignore', 'pipe', 'pipe'],
+      timeoutMs: config.gitTimeoutMs,
     });
+  } catch (error) {
+    throw new HttpError(500, `failed to run git: ${errorMessage(error)}`);
+  }
 
-    let stdout = '';
-    let stderr = '';
-    let timedOut = false;
-    let settled = false;
-
-    child.stdout.setEncoding('utf8');
-    child.stderr.setEncoding('utf8');
-    child.stdout.on('data', (chunk: string) => {
-      stdout += chunk;
+  if (result.timedOut) {
+    throw new HttpError(504, `git ${args[0]} timed out after ${config.gitTimeoutMs} ms`);
+  }
+  if (result.exitCode !== 0) {
+    throw new HttpError(502, `git ${args[0]} failed`, {
+      exitCode: result.exitCode,
+      stderr: result.stderr.trim().slice(-4000),
     });
-    child.stderr.on('data', (chunk: string) => {
-      stderr += chunk;
-    });
-
-    const finish = (action: () => void) => {
-      if (settled) {
-        return;
-      }
-      settled = true;
-      clearTimeout(timer);
-      action();
-    };
-
-    const timer = setTimeout(() => {
-      timedOut = true;
-      child.kill('SIGKILL');
-    }, config.gitTimeoutMs);
-
-    child.on('error', (error) => {
-      finish(() => reject(new HttpError(500, `failed to run git: ${error.message}`)));
-    });
-
-    child.on('close', (code) => {
-      finish(() => {
-        if (timedOut) {
-          reject(new HttpError(504, `git ${args[0]} timed out after ${config.gitTimeoutMs} ms`));
-        } else if (code !== 0) {
-          reject(
-            new HttpError(502, `git ${args[0]} failed`, {
-              exitCode: code,
-              stderr: stderr.trim().slice(-4000),
-            }),
-          );
-        } else {
-          resolve(stdout);
-        }
-      });
-    });
-  });
+  }
+  return result.stdout;
 }
 
 /**
@@ -294,17 +263,22 @@ export async function listRepos(baseDir: string, kind: RepoKind): Promise<RepoIn
     return [];
   }
 
-  const repos: RepoInfo[] = [];
-  for (const entry of entries) {
-    if (!entry.isDirectory() || entry.name.startsWith('.')) {
-      continue;
-    }
-    const dir = path.join(baseDir, entry.name);
-    if (!(await isGitRepo(dir))) {
-      continue;
-    }
-    repos.push(await buildRepoInfo(baseDir, entry.name, kind));
-  }
+  const dirs = entries.filter(
+    (entry) => entry.isDirectory() && !entry.name.startsWith('.'),
+  );
+
+  // Filter to actual git repositories in parallel.
+  const gitChecks = await Promise.all(
+    dirs.map((entry) => isGitRepo(path.join(baseDir, entry.name))),
+  );
+
+  // Gather metadata for each repository in parallel.
+  const repos = await Promise.all(
+    dirs
+      .filter((_entry, i) => Boolean(gitChecks[i]))
+      .map((entry) => buildRepoInfo(baseDir, entry.name, kind)),
+  );
+
   return repos.sort((a, b) => a.id.localeCompare(b.id));
 }
 
@@ -391,13 +365,10 @@ export async function syncRepo(
   await assertRepo(dir, cleanId, kind);
 
   const stored = await readCredentials(dir);
-  const credentials: Credentials = {
-    username: override.username ?? stored.username,
-    password: override.token ?? stored.password,
-  };
-  if (!credentials.username && credentials.password) {
-    credentials.username = 'oauth2';
-  }
+  const credentials = effectiveCredentials(stored, {
+    username: override.username,
+    token: override.token,
+  });
   if (override.token || override.username) {
     await writeCredentials(dir, credentials);
   }

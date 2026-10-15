@@ -1,12 +1,42 @@
 /**
  * Minimal FIFO semaphore used to bound the number of concurrent operations.
  *
- * Used to limit concurrent Archi runs (JVM instances) to prevent resource exhaustion.
- * Each acquire() returns a release function that must be called to free the slot.
+ * Used to limit concurrent Archi runs (JVM instances) to prevent resource
+ * exhaustion. Each acquire() returns a release function that must be called to
+ * free the slot.
  */
+
+/** Error thrown when a slot cannot be acquired within the configured timeout. */
+export class QueueTimeoutError extends Error {
+  constructor() {
+    super('timed out waiting for a semaphore slot');
+    this.name = 'QueueTimeoutError';
+  }
+}
+
+/** Error thrown when the semaphore wait queue is already at capacity. */
+export class QueueFullError extends Error {
+  constructor() {
+    super('semaphore wait queue is full');
+    this.name = 'QueueFullError';
+  }
+}
+
+export interface AcquireOptions {
+  /** Reject with {@link QueueTimeoutError} after this many milliseconds. */
+  timeoutMs?: number;
+  /** Reject with {@link QueueFullError} when the wait queue reaches this size. */
+  maxQueueLength?: number;
+}
+
+interface Waiter {
+  resolve: () => void;
+  timer?: NodeJS.Timeout;
+}
+
 export class Semaphore {
   private available: number;
-  private readonly waiters: Array<() => void> = [];
+  private readonly waiters: Waiter[] = [];
 
   constructor(size: number) {
     if (size < 1) {
@@ -19,24 +49,43 @@ export class Semaphore {
    * Acquire a semaphore slot. If available, returns immediately with a release
    * function. If not, waits for the next available slot in FIFO order.
    *
-   * @returns A function that releases the acquired slot. Must be called exactly once.
+   * @param options Optional timeout and queue-depth limits.
+   * @returns A release function. Must be called exactly once.
    */
-  async acquire(): Promise<() => void> {
+  async acquire(options: AcquireOptions = {}): Promise<() => void> {
     if (this.available > 0) {
       this.available -= 1;
       return this.release();
     }
 
-    await new Promise<void>((resolve) => {
-      this.waiters.push(resolve);
+    if (
+      options.maxQueueLength !== undefined &&
+      this.waiters.length >= options.maxQueueLength
+    ) {
+      throw new QueueFullError();
+    }
+
+    await new Promise<void>((resolve, reject) => {
+      const waiter: Waiter = { resolve };
+
+      if (options.timeoutMs !== undefined && options.timeoutMs > 0) {
+        waiter.timer = setTimeout(() => {
+          const index = this.waiters.indexOf(waiter);
+          if (index !== -1) {
+            this.waiters.splice(index, 1);
+          }
+          reject(new QueueTimeoutError());
+        }, options.timeoutMs);
+      }
+
+      this.waiters.push(waiter);
     });
 
     return this.release();
   }
 
   /**
-   * Creates a release function for the currently acquired slot.
-   * The release function is idempotent - calling it multiple times has no effect.
+   * Creates an idempotent release function for the currently acquired slot.
    */
   private release(): () => void {
     let released = false;
@@ -48,10 +97,13 @@ export class Semaphore {
 
       const nextWaiter = this.waiters.shift();
       if (nextWaiter) {
-        // Transfer the slot directly to the next waiter without incrementing available
-        nextWaiter();
+        // Hand the slot directly to the next waiter without touching `available`.
+        if (nextWaiter.timer) {
+          clearTimeout(nextWaiter.timer);
+        }
+        nextWaiter.resolve();
       } else {
-        // No waiters, release the slot back to the pool
+        // No waiters; return the slot to the pool.
         this.available += 1;
       }
     };

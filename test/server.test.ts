@@ -107,6 +107,19 @@ describe('run endpoint validation', () => {
     });
     assert.equal(reply.status, 400);
   });
+
+  test('rejects a model path that escapes the models volume', async () => {
+    const reply = await call('/api/run', {
+      method: 'POST',
+      headers: JSON_HEADERS,
+      body: JSON.stringify({
+        correlationId: 'x',
+        script: 'console.log(1)',
+        model: '../etc/passwd',
+      }),
+    });
+    assert.equal(reply.status, 400);
+  });
 });
 
 describe('repository endpoints', () => {

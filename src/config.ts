@@ -4,7 +4,7 @@ import path from 'node:path';
 /**
  * Parse string environment variable with fallback.
  */
-function parseString(name: string, fallback: string): string {
+export function parseString(name: string, fallback: string): string {
   const value = process.env[name];
   if (value === undefined || value === '') {
     return fallback;
@@ -16,7 +16,7 @@ function parseString(name: string, fallback: string): string {
  * Parse positive integer environment variable with fallback.
  * Throws if value is not a positive integer.
  */
-function parsePositiveInt(name: string, fallback: number): number {
+export function parsePositiveInt(name: string, fallback: number): number {
   const raw = process.env[name];
   if (raw === undefined || raw === '') {
     return fallback;
@@ -31,7 +31,7 @@ function parsePositiveInt(name: string, fallback: number): number {
 /**
  * Parse boolean environment variable (expects 'true'/'false').
  */
-function parseBoolean(name: string, fallback: boolean): boolean {
+export function parseBoolean(name: string, fallback: boolean): boolean {
   const value = process.env[name];
   if (value === undefined || value === '') {
     return fallback;
@@ -69,6 +69,10 @@ export const config = {
   timeoutMs: parsePositiveInt('ARCHI_TIMEOUT_MS', 120_000),
   /** Number of Archi runs allowed in parallel. Each run is a JVM + X display. */
   maxConcurrency: parsePositiveInt('ARCHI_MAX_CONCURRENCY', 1),
+  /** How long a request may wait for a run slot before returning 503. */
+  queueTimeoutMs: parsePositiveInt('ARCHI_QUEUE_TIMEOUT_MS', 120_000),
+  /** Max number of requests allowed to wait for a run slot (503 beyond this). */
+  maxQueueLength: parsePositiveInt('ARCHI_MAX_QUEUE_LENGTH', 100),
   /** Max result file size returned to the caller (base64 inflated). */
   resultMaxBytes: parsePositiveInt('ARCHI_RESULT_MAX_BYTES', 25 * 1024 * 1024),
 
