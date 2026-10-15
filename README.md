@@ -357,6 +357,9 @@ rotate it. Non-fast-forward local commits are refused (the merge only advances).
 ```bash
 npm ci
 npm run typecheck   # tsc, checks src + test (tsconfig.test.json)
+npm run lint        # eslint (flat config: @eslint/js + typescript-eslint)
+npm run format      # prettier --write on src + test
+npm run format:check # prettier --check (CI gate)
 npm test            # node --test via tsx (no external test deps)
 npm run test:ci     # same, plus test-results/junit.xml (JUnit XML)
 npm run build       # emit dist/

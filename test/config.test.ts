@@ -37,6 +37,15 @@ describe('config parsing helpers', () => {
     process.env.TEST_INT = 'abc';
     assert.throws(() => parsePositiveInt('TEST_INT', 42), /positive integer/);
 
+    process.env.TEST_INT = '3000abc';
+    assert.throws(() => parsePositiveInt('TEST_INT', 42), /positive integer/);
+
+    process.env.TEST_INT = '1.5';
+    assert.throws(() => parsePositiveInt('TEST_INT', 42), /positive integer/);
+
+    process.env.TEST_INT = '0x10';
+    assert.throws(() => parsePositiveInt('TEST_INT', 42), /positive integer/);
+
     delete process.env.TEST_INT;
   });
 

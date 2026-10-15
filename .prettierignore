@@ -1,0 +1,7 @@
+node_modules/
+dist/
+vendor/
+build/
+test-results/
+docs/
+package-lock.json

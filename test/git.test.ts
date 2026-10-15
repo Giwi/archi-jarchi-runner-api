@@ -102,7 +102,11 @@ describe('sanitizeId', () => {
 
   test('rejects traversal, separators and empty values', () => {
     for (const bad of ['', '  ', '..', '.hidden', 'a/b', 'a\\b', '-lead']) {
-      assert.throws(() => sanitizeId(bad), (error: unknown) => error instanceof HttpError && error.status === 400, bad);
+      assert.throws(
+        () => sanitizeId(bad),
+        (error: unknown) => error instanceof HttpError && error.status === 400,
+        bad,
+      );
     }
   });
 });
@@ -183,7 +187,10 @@ describeWithGit('repository management (local smart-HTTP git)', () => {
   test('listRepos returns managed repos only', async () => {
     await mkdir(path.join(modelsDir, 'not-a-repo'));
     const repos = await listRepos(modelsDir, 'model');
-    assert.deepEqual(repos.map((r) => r.id), ['demo']);
+    assert.deepEqual(
+      repos.map((r) => r.id),
+      ['demo'],
+    );
   });
 
   test('syncRepo fast-forwards to the remote', async () => {
@@ -210,7 +217,10 @@ describeWithGit('repository management (local smart-HTTP git)', () => {
   });
 
   test('sync and remove reject unknown ids', async () => {
-    for (const run of [() => syncRepo(modelsDir, 'model', 'ghost'), () => removeRepo(modelsDir, 'model', 'ghost')]) {
+    for (const run of [
+      () => syncRepo(modelsDir, 'model', 'ghost'),
+      () => removeRepo(modelsDir, 'model', 'ghost'),
+    ]) {
       await assert.rejects(
         run(),
         (error: unknown) => error instanceof HttpError && error.status === 404,

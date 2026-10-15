@@ -190,9 +190,10 @@ export async function runArchiScript(request: RunScriptRequest): Promise<RunResu
   if (outcome.stderrTruncated) {
     notes.push('stderr truncated (output exceeded the buffer limit)');
   }
-  const stderr = notes.length > 0
-    ? `${outcome.stderr}\n${notes.map((note) => `[archi-server] ${note}`).join('\n')}`
-    : outcome.stderr;
+  const stderr =
+    notes.length > 0
+      ? `${outcome.stderr}\n${notes.map((note) => `[archi-server] ${note}`).join('\n')}`
+      : outcome.stderr;
 
   log.info('archi run finished', {
     correlationId,

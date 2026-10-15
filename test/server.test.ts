@@ -44,7 +44,7 @@ interface Reply {
 async function call(pathname: string, init?: RequestInit): Promise<Reply> {
   const response = await fetch(base + pathname, init);
   const text = await response.text();
-  let body: unknown = null;
+  let body: unknown;
   try {
     body = text ? JSON.parse(text) : null;
   } catch {
@@ -65,7 +65,14 @@ describe('system endpoints', () => {
     assert.equal(reply.status, 200);
     const doc = reply.body as { openapi: string; paths: Record<string, unknown> };
     assert.match(doc.openapi, /^3\./);
-    for (const expected of ['/health', '/api/run', '/api/export/mermaid', '/api/models', '/api/scripts', '/api/models/{id}/sync']) {
+    for (const expected of [
+      '/health',
+      '/api/run',
+      '/api/export/mermaid',
+      '/api/models',
+      '/api/scripts',
+      '/api/models/{id}/sync',
+    ]) {
       assert.ok(doc.paths[expected], `missing path ${expected}`);
     }
   });
@@ -147,15 +154,28 @@ describe('repository endpoints', () => {
   });
 
   test('sync and delete return 404 for unknown ids', async () => {
-    assert.equal((await call('/api/models/ghost/sync', { method: 'POST', headers: JSON_HEADERS })).status, 404);
-    assert.equal((await call('/api/models/ghost', { method: 'DELETE', headers: AUTH })).status, 404);
-    assert.equal((await call('/api/scripts/ghost', { method: 'DELETE', headers: AUTH })).status, 404);
+    assert.equal(
+      (await call('/api/models/ghost/sync', { method: 'POST', headers: JSON_HEADERS })).status,
+      404,
+    );
+    assert.equal(
+      (await call('/api/models/ghost', { method: 'DELETE', headers: AUTH })).status,
+      404,
+    );
+    assert.equal(
+      (await call('/api/scripts/ghost', { method: 'DELETE', headers: AUTH })).status,
+      404,
+    );
   });
 });
 
 describe('mermaid export endpoint', () => {
   const post = (body: unknown): Promise<Reply> =>
-    call('/api/export/mermaid', { method: 'POST', headers: JSON_HEADERS, body: JSON.stringify(body) });
+    call('/api/export/mermaid', {
+      method: 'POST',
+      headers: JSON_HEADERS,
+      body: JSON.stringify(body),
+    });
 
   test('requires correlationId and model', async () => {
     assert.equal((await post({ correlationId: 'x' })).status, 400);

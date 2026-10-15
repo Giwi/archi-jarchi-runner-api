@@ -1,4 +1,3 @@
-import os from 'node:os';
 import path from 'node:path';
 
 /**
@@ -14,15 +13,19 @@ export function parseString(name: string, fallback: string): string {
 
 /**
  * Parse positive integer environment variable with fallback.
- * Throws if value is not a positive integer.
+ * Strict decimal parsing: rejects hex, scientific notation, decimals,
+ * whitespace, signs, and trailing garbage. Throws if not a positive integer.
  */
 export function parsePositiveInt(name: string, fallback: number): number {
   const raw = process.env[name];
   if (raw === undefined || raw === '') {
     return fallback;
   }
-  const parsed = Number.parseInt(raw, 10);
-  if (!Number.isFinite(parsed) || parsed <= 0) {
+  if (!/^\d+$/.test(raw)) {
+    throw new Error(`Environment variable ${name} must be a positive integer, got "${raw}"`);
+  }
+  const parsed = Number(raw);
+  if (parsed <= 0) {
     throw new Error(`Environment variable ${name} must be a positive integer, got "${raw}"`);
   }
   return parsed;
@@ -39,7 +42,6 @@ export function parseBoolean(name: string, fallback: boolean): boolean {
   return value.toLowerCase() === 'true';
 }
 
-const home = process.env.HOME ?? os.homedir();
 const archiHome = parseString('ARCHI_HOME', '/opt/archi');
 
 export const config = {
@@ -83,8 +85,6 @@ export const config = {
   logLevel: parseString('LOG_LEVEL', 'info'),
   /** Keep per-run directories for debugging. */
   keepRunDirs: parseBoolean('ARCHI_KEEP_RUN_DIRS', false),
-  /** User home directory. */
-  home,
 } as const;
 
 export type Config = typeof config;

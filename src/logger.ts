@@ -30,8 +30,10 @@ function emit(level: Level, message: string, fields?: Record<string, unknown>): 
  * Structured logger with JSON output.
  */
 export const log = {
-  debug: (message: string, fields?: Record<string, unknown>): void => emit('debug', message, fields),
+  debug: (message: string, fields?: Record<string, unknown>): void =>
+    emit('debug', message, fields),
   info: (message: string, fields?: Record<string, unknown>): void => emit('info', message, fields),
   warn: (message: string, fields?: Record<string, unknown>): void => emit('warn', message, fields),
-  error: (message: string, fields?: Record<string, unknown>): void => emit('error', message, fields),
+  error: (message: string, fields?: Record<string, unknown>): void =>
+    emit('error', message, fields),
 };

@@ -58,10 +58,7 @@ export class Semaphore {
       return this.release();
     }
 
-    if (
-      options.maxQueueLength !== undefined &&
-      this.waiters.length >= options.maxQueueLength
-    ) {
+    if (options.maxQueueLength !== undefined && this.waiters.length >= options.maxQueueLength) {
       throw new QueueFullError();
     }
 

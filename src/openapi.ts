@@ -100,7 +100,11 @@ export const openApiDocument = {
               'Mutually exclusive with `view`. Omit both to export the whole model.',
           },
           direction: { type: 'string', enum: ['LR', 'RL', 'TB', 'BT'], default: 'LR' },
-          relationships: { type: 'boolean', default: true, description: 'Include relationships as edges.' },
+          relationships: {
+            type: 'boolean',
+            default: true,
+            description: 'Include relationships as edges.',
+          },
         },
         required: ['correlationId', 'model'],
       },
@@ -152,7 +156,10 @@ export const openApiDocument = {
             description: "Folder name; derived from the URL's last segment when omitted.",
           },
           branch: { type: 'string', description: 'Defaults to the remote HEAD.' },
-          username: { type: 'string', description: 'Defaults to `oauth2` when only a token is given.' },
+          username: {
+            type: 'string',
+            description: 'Defaults to `oauth2` when only a token is given.',
+          },
           token: { type: 'string', description: 'Access token used as the password.' },
         },
         required: ['url'],
@@ -195,7 +202,16 @@ export const openApiDocument = {
       get: {
         tags: ['System'],
         summary: 'Liveness probe',
-        responses: { '200': { description: 'OK', content: { 'application/json': { schema: { type: 'object', properties: { status: { type: 'string' } } } } } } },
+        responses: {
+          '200': {
+            description: 'OK',
+            content: {
+              'application/json': {
+                schema: { type: 'object', properties: { status: { type: 'string' } } },
+              },
+            },
+          },
+        },
       },
     },
     '/api/run': {
@@ -207,12 +223,34 @@ export const openApiDocument = {
           content: { 'application/json': { schema: { $ref: '#/components/schemas/RunRequest' } } },
         },
         responses: {
-          '200': { description: 'Run finished', content: { 'application/json': { schema: { $ref: '#/components/schemas/RunResponse' } } } },
-          '400': { description: 'Invalid request', content: { 'application/json': { schema: { $ref: '#/components/schemas/Error' } } } },
-          '401': { description: 'Missing or invalid x-api-key', content: { 'application/json': { schema: { $ref: '#/components/schemas/Error' } } } },
-          '404': { description: 'Model not found', content: { 'application/json': { schema: { $ref: '#/components/schemas/Error' } } } },
-          '503': { description: 'Server busy (concurrency limit reached)', content: { 'application/json': { schema: { $ref: '#/components/schemas/Error' } } } },
-          '504': { description: 'Run timed out', content: { 'application/json': { schema: { $ref: '#/components/schemas/RunResponse' } } } },
+          '200': {
+            description: 'Run finished',
+            content: {
+              'application/json': { schema: { $ref: '#/components/schemas/RunResponse' } },
+            },
+          },
+          '400': {
+            description: 'Invalid request',
+            content: { 'application/json': { schema: { $ref: '#/components/schemas/Error' } } },
+          },
+          '401': {
+            description: 'Missing or invalid x-api-key',
+            content: { 'application/json': { schema: { $ref: '#/components/schemas/Error' } } },
+          },
+          '404': {
+            description: 'Model not found',
+            content: { 'application/json': { schema: { $ref: '#/components/schemas/Error' } } },
+          },
+          '503': {
+            description: 'Server busy (concurrency limit reached)',
+            content: { 'application/json': { schema: { $ref: '#/components/schemas/Error' } } },
+          },
+          '504': {
+            description: 'Run timed out',
+            content: {
+              'application/json': { schema: { $ref: '#/components/schemas/RunResponse' } },
+            },
+          },
         },
       },
     },
@@ -222,14 +260,39 @@ export const openApiDocument = {
         summary: 'Export ArchiMate view(s) as Markdown with Mermaid flowcharts',
         requestBody: {
           required: true,
-          content: { 'application/json': { schema: { $ref: '#/components/schemas/MermaidExportRequest' } } },
+          content: {
+            'application/json': { schema: { $ref: '#/components/schemas/MermaidExportRequest' } },
+          },
         },
         responses: {
-          '200': { description: 'Generated', content: { 'application/json': { schema: { $ref: '#/components/schemas/MermaidExportResponse' } } } },
-          '400': { description: 'Invalid request', content: { 'application/json': { schema: { $ref: '#/components/schemas/Error' } } } },
-          '404': { description: 'Model not found, or no views matched', content: { 'application/json': { schema: { $ref: '#/components/schemas/Error' } } } },
-          '503': { description: 'Server busy (concurrency limit reached)', content: { 'application/json': { schema: { $ref: '#/components/schemas/Error' } } } },
-          '504': { description: 'Run timed out', content: { 'application/json': { schema: { $ref: '#/components/schemas/MermaidExportResponse' } } } },
+          '200': {
+            description: 'Generated',
+            content: {
+              'application/json': {
+                schema: { $ref: '#/components/schemas/MermaidExportResponse' },
+              },
+            },
+          },
+          '400': {
+            description: 'Invalid request',
+            content: { 'application/json': { schema: { $ref: '#/components/schemas/Error' } } },
+          },
+          '404': {
+            description: 'Model not found, or no views matched',
+            content: { 'application/json': { schema: { $ref: '#/components/schemas/Error' } } },
+          },
+          '503': {
+            description: 'Server busy (concurrency limit reached)',
+            content: { 'application/json': { schema: { $ref: '#/components/schemas/Error' } } },
+          },
+          '504': {
+            description: 'Run timed out',
+            content: {
+              'application/json': {
+                schema: { $ref: '#/components/schemas/MermaidExportResponse' },
+              },
+            },
+          },
         },
       },
     },
@@ -237,21 +300,43 @@ export const openApiDocument = {
       get: {
         tags: ['Models'],
         summary: 'List model repositories',
-        responses: { '200': { description: 'OK', content: { 'application/json': { schema: { $ref: '#/components/schemas/ModelList' } } } } },
+        responses: {
+          '200': {
+            description: 'OK',
+            content: { 'application/json': { schema: { $ref: '#/components/schemas/ModelList' } } },
+          },
+        },
       },
       post: {
         tags: ['Models'],
         summary: 'Clone a model repository',
         requestBody: {
           required: true,
-          content: { 'application/json': { schema: { $ref: '#/components/schemas/RepoAddRequest' } } },
+          content: {
+            'application/json': { schema: { $ref: '#/components/schemas/RepoAddRequest' } },
+          },
         },
         responses: {
-          '201': { description: 'Cloned', content: { 'application/json': { schema: { $ref: '#/components/schemas/Repo' } } } },
-          '400': { description: 'Invalid body or URL', content: { 'application/json': { schema: { $ref: '#/components/schemas/Error' } } } },
-          '409': { description: 'Id already exists', content: { 'application/json': { schema: { $ref: '#/components/schemas/Error' } } } },
-          '502': { description: 'git clone failed', content: { 'application/json': { schema: { $ref: '#/components/schemas/Error' } } } },
-          '504': { description: 'git timed out', content: { 'application/json': { schema: { $ref: '#/components/schemas/Error' } } } },
+          '201': {
+            description: 'Cloned',
+            content: { 'application/json': { schema: { $ref: '#/components/schemas/Repo' } } },
+          },
+          '400': {
+            description: 'Invalid body or URL',
+            content: { 'application/json': { schema: { $ref: '#/components/schemas/Error' } } },
+          },
+          '409': {
+            description: 'Id already exists',
+            content: { 'application/json': { schema: { $ref: '#/components/schemas/Error' } } },
+          },
+          '502': {
+            description: 'git clone failed',
+            content: { 'application/json': { schema: { $ref: '#/components/schemas/Error' } } },
+          },
+          '504': {
+            description: 'git timed out',
+            content: { 'application/json': { schema: { $ref: '#/components/schemas/Error' } } },
+          },
         },
       },
     },
@@ -260,12 +345,31 @@ export const openApiDocument = {
         tags: ['Models'],
         summary: 'Sync a model repository (fetch + fast-forward)',
         parameters: [{ $ref: '#/components/parameters/RepoId' }],
-        requestBody: { required: false, content: { 'application/json': { schema: { $ref: '#/components/schemas/RepoSyncRequest' } } } },
+        requestBody: {
+          required: false,
+          content: {
+            'application/json': { schema: { $ref: '#/components/schemas/RepoSyncRequest' } },
+          },
+        },
         responses: {
-          '200': { description: 'Synced', content: { 'application/json': { schema: { $ref: '#/components/schemas/RepoSyncResult' } } } },
-          '404': { description: 'Unknown repository', content: { 'application/json': { schema: { $ref: '#/components/schemas/Error' } } } },
-          '409': { description: 'Not a git repo or detached HEAD', content: { 'application/json': { schema: { $ref: '#/components/schemas/Error' } } } },
-          '502': { description: 'git failed', content: { 'application/json': { schema: { $ref: '#/components/schemas/Error' } } } },
+          '200': {
+            description: 'Synced',
+            content: {
+              'application/json': { schema: { $ref: '#/components/schemas/RepoSyncResult' } },
+            },
+          },
+          '404': {
+            description: 'Unknown repository',
+            content: { 'application/json': { schema: { $ref: '#/components/schemas/Error' } } },
+          },
+          '409': {
+            description: 'Not a git repo or detached HEAD',
+            content: { 'application/json': { schema: { $ref: '#/components/schemas/Error' } } },
+          },
+          '502': {
+            description: 'git failed',
+            content: { 'application/json': { schema: { $ref: '#/components/schemas/Error' } } },
+          },
         },
       },
     },
@@ -276,8 +380,14 @@ export const openApiDocument = {
         parameters: [{ $ref: '#/components/parameters/RepoId' }],
         responses: {
           '204': { description: 'Removed' },
-          '404': { description: 'Unknown repository', content: { 'application/json': { schema: { $ref: '#/components/schemas/Error' } } } },
-          '409': { description: 'Not a git repo', content: { 'application/json': { schema: { $ref: '#/components/schemas/Error' } } } },
+          '404': {
+            description: 'Unknown repository',
+            content: { 'application/json': { schema: { $ref: '#/components/schemas/Error' } } },
+          },
+          '409': {
+            description: 'Not a git repo',
+            content: { 'application/json': { schema: { $ref: '#/components/schemas/Error' } } },
+          },
         },
       },
     },
@@ -285,21 +395,45 @@ export const openApiDocument = {
       get: {
         tags: ['Scripts'],
         summary: 'List script repositories',
-        responses: { '200': { description: 'OK', content: { 'application/json': { schema: { $ref: '#/components/schemas/ScriptList' } } } } },
+        responses: {
+          '200': {
+            description: 'OK',
+            content: {
+              'application/json': { schema: { $ref: '#/components/schemas/ScriptList' } },
+            },
+          },
+        },
       },
       post: {
         tags: ['Scripts'],
         summary: 'Clone a script repository',
         requestBody: {
           required: true,
-          content: { 'application/json': { schema: { $ref: '#/components/schemas/RepoAddRequest' } } },
+          content: {
+            'application/json': { schema: { $ref: '#/components/schemas/RepoAddRequest' } },
+          },
         },
         responses: {
-          '201': { description: 'Cloned', content: { 'application/json': { schema: { $ref: '#/components/schemas/Repo' } } } },
-          '400': { description: 'Invalid body or URL', content: { 'application/json': { schema: { $ref: '#/components/schemas/Error' } } } },
-          '409': { description: 'Id already exists', content: { 'application/json': { schema: { $ref: '#/components/schemas/Error' } } } },
-          '502': { description: 'git clone failed', content: { 'application/json': { schema: { $ref: '#/components/schemas/Error' } } } },
-          '504': { description: 'git timed out', content: { 'application/json': { schema: { $ref: '#/components/schemas/Error' } } } },
+          '201': {
+            description: 'Cloned',
+            content: { 'application/json': { schema: { $ref: '#/components/schemas/Repo' } } },
+          },
+          '400': {
+            description: 'Invalid body or URL',
+            content: { 'application/json': { schema: { $ref: '#/components/schemas/Error' } } },
+          },
+          '409': {
+            description: 'Id already exists',
+            content: { 'application/json': { schema: { $ref: '#/components/schemas/Error' } } },
+          },
+          '502': {
+            description: 'git clone failed',
+            content: { 'application/json': { schema: { $ref: '#/components/schemas/Error' } } },
+          },
+          '504': {
+            description: 'git timed out',
+            content: { 'application/json': { schema: { $ref: '#/components/schemas/Error' } } },
+          },
         },
       },
     },
@@ -308,12 +442,31 @@ export const openApiDocument = {
         tags: ['Scripts'],
         summary: 'Sync a script repository (fetch + fast-forward)',
         parameters: [{ $ref: '#/components/parameters/RepoId' }],
-        requestBody: { required: false, content: { 'application/json': { schema: { $ref: '#/components/schemas/RepoSyncRequest' } } } },
+        requestBody: {
+          required: false,
+          content: {
+            'application/json': { schema: { $ref: '#/components/schemas/RepoSyncRequest' } },
+          },
+        },
         responses: {
-          '200': { description: 'Synced', content: { 'application/json': { schema: { $ref: '#/components/schemas/RepoSyncResult' } } } },
-          '404': { description: 'Unknown repository', content: { 'application/json': { schema: { $ref: '#/components/schemas/Error' } } } },
-          '409': { description: 'Not a git repo or detached HEAD', content: { 'application/json': { schema: { $ref: '#/components/schemas/Error' } } } },
-          '502': { description: 'git failed', content: { 'application/json': { schema: { $ref: '#/components/schemas/Error' } } } },
+          '200': {
+            description: 'Synced',
+            content: {
+              'application/json': { schema: { $ref: '#/components/schemas/RepoSyncResult' } },
+            },
+          },
+          '404': {
+            description: 'Unknown repository',
+            content: { 'application/json': { schema: { $ref: '#/components/schemas/Error' } } },
+          },
+          '409': {
+            description: 'Not a git repo or detached HEAD',
+            content: { 'application/json': { schema: { $ref: '#/components/schemas/Error' } } },
+          },
+          '502': {
+            description: 'git failed',
+            content: { 'application/json': { schema: { $ref: '#/components/schemas/Error' } } },
+          },
         },
       },
     },
@@ -324,8 +477,14 @@ export const openApiDocument = {
         parameters: [{ $ref: '#/components/parameters/RepoId' }],
         responses: {
           '204': { description: 'Removed' },
-          '404': { description: 'Unknown repository', content: { 'application/json': { schema: { $ref: '#/components/schemas/Error' } } } },
-          '409': { description: 'Not a git repo', content: { 'application/json': { schema: { $ref: '#/components/schemas/Error' } } } },
+          '404': {
+            description: 'Unknown repository',
+            content: { 'application/json': { schema: { $ref: '#/components/schemas/Error' } } },
+          },
+          '409': {
+            description: 'Not a git repo',
+            content: { 'application/json': { schema: { $ref: '#/components/schemas/Error' } } },
+          },
         },
       },
     },

@@ -263,9 +263,7 @@ export async function listRepos(baseDir: string, kind: RepoKind): Promise<RepoIn
     return [];
   }
 
-  const dirs = entries.filter(
-    (entry) => entry.isDirectory() && !entry.name.startsWith('.'),
-  );
+  const dirs = entries.filter((entry) => entry.isDirectory() && !entry.name.startsWith('.'));
 
   // Filter to actual git repositories in parallel.
   const gitChecks = await Promise.all(
@@ -320,9 +318,8 @@ export async function addRepo(
   }
 
   const askPassAvailable = existsSync(config.gitAskPass);
-  const cloneUrl = hasCredentials(credentials) && !askPassAvailable
-    ? embedCredentials(url, credentials)
-    : url;
+  const cloneUrl =
+    hasCredentials(credentials) && !askPassAvailable ? embedCredentials(url, credentials) : url;
   const args = ['clone', '--quiet'];
   if (branch) {
     args.push('--branch', branch);
