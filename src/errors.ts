@@ -1,3 +1,7 @@
+/**
+ * HTTP error with structured status code and optional details.
+ * Used for consistent error handling in API routes.
+ */
 export class HttpError extends Error {
   readonly status: number;
   readonly details?: unknown;
@@ -10,6 +14,9 @@ export class HttpError extends Error {
   }
 }
 
+/**
+ * Type guard to check if an error is an HttpError.
+ */
 export function isHttpError(error: unknown): error is HttpError {
   return error instanceof HttpError;
 }

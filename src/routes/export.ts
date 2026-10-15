@@ -8,11 +8,17 @@ import type { MermaidDirection, MermaidExportRequest } from '../types.js';
 
 const DIRECTIONS: readonly MermaidDirection[] = ['LR', 'RL', 'TB', 'BT'];
 
+/**
+ * Parse and validate the request body for Mermaid export.
+ */
 function parseMermaidBody(value: unknown): MermaidExportRequest {
   if (typeof value !== 'object' || value === null || Array.isArray(value)) {
     throw new HttpError(400, 'request body must be a JSON object');
   }
-  const { correlationId, model, view, folder, direction, relationships } = value as Record<string, unknown>;
+  const { correlationId, model, view, folder, direction, relationships } = value as Record<
+    string,
+    unknown
+  >;
 
   if (typeof correlationId !== 'string' || correlationId.trim() === '') {
     throw new HttpError(400, 'correlationId must be a non-empty string');
@@ -21,7 +27,10 @@ function parseMermaidBody(value: unknown): MermaidExportRequest {
     throw new HttpError(400, 'model must be a non-empty string');
   }
 
-  const request: MermaidExportRequest = { correlationId, model };
+  const request: MermaidExportRequest = {
+    correlationId: correlationId.trim(),
+    model: model.trim(),
+  };
 
   if (view !== undefined) {
     if (typeof view !== 'string' || view.trim() === '') {
@@ -55,6 +64,9 @@ function parseMermaidBody(value: unknown): MermaidExportRequest {
 
 export const exportRouter = Router();
 
+/**
+ * Export ArchiMate view(s) as Markdown with Mermaid flowcharts.
+ */
 exportRouter.post('/export/mermaid', async (req: Request, res: Response, next: NextFunction) => {
   let release: (() => void) | undefined;
   try {
@@ -64,14 +76,19 @@ exportRouter.post('/export/mermaid', async (req: Request, res: Response, next: N
     const result = await runMermaidExport(body);
 
     const { timedOut, ...payload } = result;
-    const content = (result.result?.content ?? null) as { markdown?: unknown; error?: unknown } | null;
+    const content = (result.result?.content ?? null) as {
+      markdown?: unknown;
+      error?: unknown;
+    } | null;
 
     if (content && typeof content.error === 'string') {
       throw new HttpError(404, content.error);
     }
 
     const markdown = content && typeof content.markdown === 'string' ? content.markdown : null;
-    if (timedOut) log.warn('mermaid export timed out', { correlationId: body.correlationId });
+    if (timedOut) {
+      log.warn('mermaid export timed out', { correlationId: body.correlationId });
+    }
     res.status(timedOut ? 504 : 200).json({ ...payload, markdown });
   } catch (error) {
     next(error);

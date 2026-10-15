@@ -8,6 +8,9 @@ import type { RunRequestBody } from '../types.js';
 
 const limiter = runLimiter;
 
+/**
+ * Parse and validate the request body for running a script.
+ */
 function parseBody(value: unknown): RunRequestBody {
   if (typeof value !== 'object' || value === null || Array.isArray(value)) {
     throw new HttpError(400, 'request body must be a JSON object');
@@ -24,11 +27,18 @@ function parseBody(value: unknown): RunRequestBody {
     throw new HttpError(400, 'model must be a non-empty string');
   }
 
-  return { correlationId, script, model };
+  return {
+    correlationId: correlationId.trim(),
+    script: script.trim(),
+    model: model.trim(),
+  };
 }
 
 export const runRouter = Router();
 
+/**
+ * Execute a jArchi script against a model.
+ */
 runRouter.post('/run', async (req: Request, res: Response, next: NextFunction) => {
   let release: (() => void) | undefined;
   try {

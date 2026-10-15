@@ -1,14 +1,26 @@
 import os from 'node:os';
 import path from 'node:path';
 
-function str(name: string, fallback: string): string {
+/**
+ * Parse string environment variable with fallback.
+ */
+function parseString(name: string, fallback: string): string {
   const value = process.env[name];
-  return value === undefined || value === '' ? fallback : value;
+  if (value === undefined || value === '') {
+    return fallback;
+  }
+  return value;
 }
 
-function int(name: string, fallback: number): number {
+/**
+ * Parse positive integer environment variable with fallback.
+ * Throws if value is not a positive integer.
+ */
+function parsePositiveInt(name: string, fallback: number): number {
   const raw = process.env[name];
-  if (raw === undefined || raw === '') return fallback;
+  if (raw === undefined || raw === '') {
+    return fallback;
+  }
   const parsed = Number.parseInt(raw, 10);
   if (!Number.isFinite(parsed) || parsed <= 0) {
     throw new Error(`Environment variable ${name} must be a positive integer, got "${raw}"`);
@@ -16,43 +28,58 @@ function int(name: string, fallback: number): number {
   return parsed;
 }
 
+/**
+ * Parse boolean environment variable (expects 'true'/'false').
+ */
+function parseBoolean(name: string, fallback: boolean): boolean {
+  const value = process.env[name];
+  if (value === undefined || value === '') {
+    return fallback;
+  }
+  return value.toLowerCase() === 'true';
+}
+
 const home = process.env.HOME ?? os.homedir();
-const archiHome = str('ARCHI_HOME', '/opt/archi');
+const archiHome = parseString('ARCHI_HOME', '/opt/archi');
 
 export const config = {
-  host: str('HOST', '0.0.0.0'),
-  port: int('PORT', 3000),
+  host: parseString('HOST', '0.0.0.0'),
+  port: parsePositiveInt('PORT', 3000),
 
   /** Archi installation root (contains the `Archi` launcher and `plugins/`). */
   archiHome,
-  archiBinary: str('ARCHI_BINARY', path.join(archiHome, 'Archi')),
+  /** Path to the Archi binary. */
+  archiBinary: parseString('ARCHI_BINARY', path.join(archiHome, 'Archi')),
 
   /** Mounted volume: jArchi user scripts folder (used as CommonJS root). */
-  scriptsDir: str('ARCHI_SCRIPTS_DIR', '/scripts'),
+  scriptsDir: parseString('ARCHI_SCRIPTS_DIR', '/scripts'),
   /** Mounted volume: coArchi model repositories / `.archimate` models. */
-  modelsDir: str('ARCHI_MODELS_DIR', '/models'),
+  modelsDir: parseString('ARCHI_MODELS_DIR', '/models'),
   /** Scratch dir for per-run working directories. */
-  runsDir: str('ARCHI_RUNS_DIR', '/var/archi/runs'),
+  runsDir: parseString('ARCHI_RUNS_DIR', '/var/archi/runs'),
 
   /** Git binary used for repository management. */
-  gitBinary: str('GIT_BINARY', 'git'),
+  gitBinary: parseString('GIT_BINARY', 'git'),
   /** Timeout for a single git operation (clone/fetch/merge). */
-  gitTimeoutMs: int('ARCHI_GIT_TIMEOUT_MS', 300_000),
+  gitTimeoutMs: parsePositiveInt('ARCHI_GIT_TIMEOUT_MS', 300_000),
   /** Askpass helper that feeds the access token to git without exposing it in argv. */
-  gitAskPass: str('ARCHI_GIT_ASKPASS', '/usr/local/bin/git-askpass.sh'),
+  gitAskPass: parseString('ARCHI_GIT_ASKPASS', '/usr/local/bin/git-askpass.sh'),
 
   /** Hard limit for a single Archi invocation. */
-  timeoutMs: int('ARCHI_TIMEOUT_MS', 120_000),
+  timeoutMs: parsePositiveInt('ARCHI_TIMEOUT_MS', 120_000),
   /** Number of Archi runs allowed in parallel. Each run is a JVM + X display. */
-  maxConcurrency: int('ARCHI_MAX_CONCURRENCY', 1),
+  maxConcurrency: parsePositiveInt('ARCHI_MAX_CONCURRENCY', 1),
   /** Max result file size returned to the caller (base64 inflated). */
-  resultMaxBytes: int('ARCHI_RESULT_MAX_BYTES', 25 * 1024 * 1024),
+  resultMaxBytes: parsePositiveInt('ARCHI_RESULT_MAX_BYTES', 25 * 1024 * 1024),
 
   /** Optional shared secret. When set, requests must send `x-api-key`. */
-  apiKey: str('API_KEY', ''),
+  apiKey: parseString('API_KEY', ''),
 
-  logLevel: str('LOG_LEVEL', 'info'),
-  keepRunDirs: str('ARCHI_KEEP_RUN_DIRS', 'false') === 'true',
+  /** Log level: debug | info | warn | error. */
+  logLevel: parseString('LOG_LEVEL', 'info'),
+  /** Keep per-run directories for debugging. */
+  keepRunDirs: parseBoolean('ARCHI_KEEP_RUN_DIRS', false),
+  /** User home directory. */
   home,
 } as const;
 

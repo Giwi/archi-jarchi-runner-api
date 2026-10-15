@@ -161,6 +161,10 @@ const MERMAID_EXPORT_SCRIPT = String.raw`
 })();
 `;
 
+/**
+ * Export ArchiMate views as Markdown with Mermaid flowcharts.
+ * Uses a bundled jArchi script to extract view data and generate diagrams.
+ */
 export async function runMermaidExport(request: MermaidExportRequest): Promise<RunResult> {
   return runArchiScript({
     correlationId: request.correlationId,

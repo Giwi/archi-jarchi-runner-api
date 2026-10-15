@@ -2,6 +2,7 @@ node_modules/
 dist/
 test-results/
 *.log
+.opencode
 
 # Downloaded / provided binaries (see scripts/fetch-archi.sh)
 vendor/archi/*

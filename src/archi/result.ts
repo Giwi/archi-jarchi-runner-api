@@ -10,7 +10,9 @@ const RESULT_KEYS = ['resultFile', 'result_file', 'result'];
  */
 function* jsonCandidates(text: string): Generator<string> {
   for (let i = 0; i < text.length; i++) {
-    if (text[i] !== '{') continue;
+    if (text[i] !== '{') {
+      continue;
+    }
 
     let depth = 0;
     let inString = false;
@@ -19,9 +21,13 @@ function* jsonCandidates(text: string): Generator<string> {
     for (let j = i; j < text.length; j++) {
       const ch = text[j];
       if (inString) {
-        if (escaped) escaped = false;
-        else if (ch === '\\') escaped = true;
-        else if (ch === '"') inString = false;
+        if (escaped) {
+          escaped = false;
+        } else if (ch === '\\') {
+          escaped = true;
+        } else if (ch === '"') {
+          inString = false;
+        }
         continue;
       }
       if (ch === '"') {
@@ -52,7 +58,9 @@ export function findResultFile(stdout: string): string | null {
     } catch {
       continue;
     }
-    if (parsed === null || typeof parsed !== 'object' || Array.isArray(parsed)) continue;
+    if (parsed === null || typeof parsed !== 'object' || Array.isArray(parsed)) {
+      continue;
+    }
 
     for (const key of RESULT_KEYS) {
       const value = (parsed as Record<string, unknown>)[key];
@@ -72,8 +80,13 @@ function decodeUtf8(buffer: Buffer): string | null {
   }
 }
 
-/** Read a potentially large file into a bounded buffer. */
-async function readBounded(file: string, maxBytes: number): Promise<{ data: Buffer; size: number }> {
+/**
+ * Read a potentially large file into a bounded buffer.
+ */
+async function readBounded(
+  file: string,
+  maxBytes: number,
+): Promise<{ data: Buffer; size: number }> {
   const info = await stat(file);
   const toRead = Math.min(info.size, maxBytes);
   const handle = await open(file, 'r');

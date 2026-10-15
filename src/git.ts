@@ -22,6 +22,7 @@ function fail(status: number, message: string, details?: unknown): never {
   throw new HttpError(status, message, details);
 }
 
+/** Validate a repository id, returning it trimmed. */
 export function sanitizeId(raw: unknown): string {
   if (typeof raw !== 'string' || raw.trim() === '') {
     fail(400, 'id must be a non-empty string');
@@ -33,6 +34,7 @@ export function sanitizeId(raw: unknown): string {
   return id;
 }
 
+/** Derive a safe repository id from a git URL's last path segment. */
 function deriveId(url: string): string {
   const withoutQuery = url.split(/[?#]/, 1)[0] ?? url;
   const last = withoutQuery.replace(/\/+$/, '').split('/').pop() ?? '';
@@ -47,10 +49,16 @@ function deriveId(url: string): string {
 function splitCredentials(rawUrl: string): { url: string; credentials: Credentials } {
   try {
     const parsed = new URL(rawUrl);
-    if (!parsed.username && !parsed.password) return { url: rawUrl, credentials: {} };
+    if (!parsed.username && !parsed.password) {
+      return { url: rawUrl, credentials: {} };
+    }
     const credentials: Credentials = {};
-    if (parsed.username) credentials.username = decodeURIComponent(parsed.username);
-    if (parsed.password) credentials.password = decodeURIComponent(parsed.password);
+    if (parsed.username) {
+      credentials.username = decodeURIComponent(parsed.username);
+    }
+    if (parsed.password) {
+      credentials.password = decodeURIComponent(parsed.password);
+    }
     parsed.username = '';
     parsed.password = '';
     return { url: parsed.toString(), credentials };
@@ -59,10 +67,13 @@ function splitCredentials(rawUrl: string): { url: string; credentials: Credentia
   }
 }
 
+/** Remove any credentials embedded in a URL (for display/logging). */
 function stripCredentials(rawUrl: string): string {
   try {
     const parsed = new URL(rawUrl);
-    if (!parsed.username && !parsed.password) return rawUrl;
+    if (!parsed.username && !parsed.password) {
+      return rawUrl;
+    }
     parsed.username = '';
     parsed.password = '';
     return parsed.toString();
@@ -72,6 +83,7 @@ function stripCredentials(rawUrl: string): string {
   }
 }
 
+/** Whether a credential object carries a username or password. */
 function hasCredentials(credentials: Credentials): boolean {
   return Boolean(credentials.username || credentials.password);
 }
@@ -96,10 +108,13 @@ function effectiveCredentials(
 ): Credentials {
   const username = override.username ?? embedded.username;
   const password = override.token ?? embedded.password;
-  if (!username && password) return { username: 'oauth2', password };
+  if (!username && password) {
+    return { username: 'oauth2', password };
+  }
   return { username, password };
 }
 
+/** Build the environment for a git invocation, wiring the askpass helper. */
 function gitEnv(credentials: Credentials): NodeJS.ProcessEnv {
   const env: NodeJS.ProcessEnv = { ...process.env, GIT_TERMINAL_PROMPT: '0' };
   if (hasCredentials(credentials)) {
@@ -119,6 +134,10 @@ interface GitOptions {
   credentials?: Credentials;
 }
 
+/**
+ * Run a git command, resolving to its stdout or rejecting with an HttpError.
+ * Enforces a timeout and never prompts for credentials.
+ */
 function runGit(args: string[], options: GitOptions = {}): Promise<string> {
   return new Promise<string>((resolve, reject) => {
     const child = spawn(config.gitBinary, args, {
@@ -142,7 +161,9 @@ function runGit(args: string[], options: GitOptions = {}): Promise<string> {
     });
 
     const finish = (action: () => void) => {
-      if (settled) return;
+      if (settled) {
+        return;
+      }
       settled = true;
       clearTimeout(timer);
       action();
@@ -176,6 +197,10 @@ function runGit(args: string[], options: GitOptions = {}): Promise<string> {
   });
 }
 
+/**
+ * Run a git command, swallowing errors and returning `null` on failure.
+ * Used for non-critical inspection commands (e.g. reading metadata).
+ */
 async function tryGit(args: string[], options: GitOptions = {}): Promise<string | null> {
   try {
     return (await runGit(args, options)).trim();
@@ -184,6 +209,10 @@ async function tryGit(args: string[], options: GitOptions = {}): Promise<string 
   }
 }
 
+/**
+ * Resolve a repository id to its on-disk directory, ensuring it stays inside
+ * the managed base directory (defense in depth against path traversal).
+ */
 function repoDir(baseDir: string, id: string): string {
   const dir = path.join(baseDir, sanitizeId(id));
   const relative = path.relative(baseDir, dir);
@@ -193,6 +222,7 @@ function repoDir(baseDir: string, id: string): string {
   return dir;
 }
 
+/** Check whether a directory is a git repository (has a `.git` directory). */
 async function isGitRepo(dir: string): Promise<boolean> {
   try {
     return (await stat(path.join(dir, '.git'))).isDirectory();
@@ -201,29 +231,37 @@ async function isGitRepo(dir: string): Promise<boolean> {
   }
 }
 
+/** Assert that a directory exists and is a git-managed repository. */
 async function assertRepo(dir: string, id: string, kind: RepoKind): Promise<void> {
   if (!existsSync(dir)) fail(404, `${kind} "${id}" not found`);
   if (!(await isGitRepo(dir))) fail(409, `"${id}" is not a git-managed ${kind}`);
 }
 
+/** Read stored credentials from a repository's `.git` directory. */
 async function readCredentials(dir: string): Promise<Credentials> {
   try {
     const raw = await readFile(path.join(dir, '.git', CREDENTIALS_FILE), 'utf8');
     const parsed = JSON.parse(raw) as Credentials;
-    if (parsed && typeof parsed === 'object') return parsed;
+    if (parsed && typeof parsed === 'object') {
+      return parsed;
+    }
   } catch {
     // no stored credentials
   }
   return {};
 }
 
+/** Persist credentials to a repository's `.git` directory with restricted permissions. */
 async function writeCredentials(dir: string, credentials: Credentials): Promise<void> {
-  if (!hasCredentials(credentials)) return;
+  if (!hasCredentials(credentials)) {
+    return;
+  }
   const file = path.join(dir, '.git', CREDENTIALS_FILE);
   await writeFile(file, JSON.stringify(credentials), { encoding: 'utf8', mode: 0o600 });
   await chmod(file, 0o600).catch(() => undefined);
 }
 
+/** Gather repository metadata (url, branch, commit, dirty status) in parallel. */
 async function buildRepoInfo(baseDir: string, id: string, kind: RepoKind): Promise<RepoInfo> {
   const dir = repoDir(baseDir, id);
   const [url, branch, log, status] = await Promise.all([
@@ -247,6 +285,7 @@ async function buildRepoInfo(baseDir: string, id: string, kind: RepoKind): Promi
   };
 }
 
+/** List all git-managed repositories in a base directory. */
 export async function listRepos(baseDir: string, kind: RepoKind): Promise<RepoInfo[]> {
   let entries;
   try {
@@ -257,14 +296,21 @@ export async function listRepos(baseDir: string, kind: RepoKind): Promise<RepoIn
 
   const repos: RepoInfo[] = [];
   for (const entry of entries) {
-    if (!entry.isDirectory() || entry.name.startsWith('.')) continue;
+    if (!entry.isDirectory() || entry.name.startsWith('.')) {
+      continue;
+    }
     const dir = path.join(baseDir, entry.name);
-    if (!(await isGitRepo(dir))) continue;
+    if (!(await isGitRepo(dir))) {
+      continue;
+    }
     repos.push(await buildRepoInfo(baseDir, entry.name, kind));
   }
   return repos.sort((a, b) => a.id.localeCompare(b.id));
 }
 
+/**
+ * Clone a new git-managed repository into the base directory.
+ */
 export async function addRepo(
   baseDir: string,
   kind: RepoKind,
@@ -295,14 +341,18 @@ export async function addRepo(
   await mkdir(baseDir, { recursive: true });
   const dir = repoDir(baseDir, id);
 
-  if (existsSync(dir)) fail(409, `a ${kind} with id "${id}" already exists`);
+  if (existsSync(dir)) {
+    fail(409, `a ${kind} with id "${id}" already exists`);
+  }
 
   const askPassAvailable = existsSync(config.gitAskPass);
   const cloneUrl = hasCredentials(credentials) && !askPassAvailable
     ? embedCredentials(url, credentials)
     : url;
   const args = ['clone', '--quiet'];
-  if (branch) args.push('--branch', branch);
+  if (branch) {
+    args.push('--branch', branch);
+  }
   args.push(cloneUrl, dir);
 
   log.info('cloning repository', { kind, id, url, branch });
@@ -327,6 +377,9 @@ export interface RepoSyncResult extends RepoInfo {
   previousCommit: string | null;
 }
 
+/**
+ * Fetch and fast-forward a repository to its remote HEAD.
+ */
 export async function syncRepo(
   baseDir: string,
   kind: RepoKind,
@@ -342,8 +395,12 @@ export async function syncRepo(
     username: override.username ?? stored.username,
     password: override.token ?? stored.password,
   };
-  if (!credentials.username && credentials.password) credentials.username = 'oauth2';
-  if (override.token || override.username) await writeCredentials(dir, credentials);
+  if (!credentials.username && credentials.password) {
+    credentials.username = 'oauth2';
+  }
+  if (override.token || override.username) {
+    await writeCredentials(dir, credentials);
+  }
 
   const branch = await tryGit(['rev-parse', '--abbrev-ref', 'HEAD'], { cwd: dir });
   if (!branch || branch === 'HEAD') {
@@ -357,9 +414,14 @@ export async function syncRepo(
   await runGit(['merge', '--ff-only', `origin/${branch}`], { cwd: dir, credentials });
 
   const info = await buildRepoInfo(baseDir, cleanId, kind);
-  return { ...info, updated: info.commit !== previousCommit, previousCommit: previousCommit ?? null };
+  return {
+    ...info,
+    updated: info.commit !== previousCommit,
+    previousCommit: previousCommit ?? null,
+  };
 }
 
+/** Remove a git-managed repository directory. */
 export async function removeRepo(baseDir: string, kind: RepoKind, id: string): Promise<void> {
   const cleanId = sanitizeId(id);
   const dir = repoDir(baseDir, cleanId);
@@ -368,6 +430,10 @@ export async function removeRepo(baseDir: string, kind: RepoKind, id: string): P
   await rm(dir, { recursive: true, force: true });
 }
 
+/**
+ * Re-embed credentials into a URL (only used as a fallback when the askpass
+ * helper is unavailable).
+ */
 function embedCredentials(url: string, credentials: Credentials): string {
   try {
     const parsed = new URL(url);

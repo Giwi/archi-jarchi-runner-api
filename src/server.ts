@@ -8,6 +8,9 @@ import { exportRouter } from './routes/export.js';
 import { createReposRouter } from './routes/repos.js';
 import { runRouter } from './routes/run.js';
 
+/**
+ * Type guard for Express body-parser errors.
+ */
 function isBodyParserError(error: unknown): error is { status?: number; type: string } {
   return (
     typeof error === 'object' &&
@@ -18,12 +21,16 @@ function isBodyParserError(error: unknown): error is { status?: number; type: st
   );
 }
 
+/**
+ * Create and configure the Express application.
+ */
 export function createApp(): express.Express {
   const app = express();
 
   app.disable('x-powered-by');
   app.use(express.json({ limit: '10mb' }));
 
+  // Public health check endpoint.
   app.get('/health', (_req: Request, res: Response) => {
     res.json({ status: 'ok' });
   });
@@ -33,7 +40,7 @@ export function createApp(): express.Express {
     res.json(openApiDocument);
   });
 
-  // Optional shared-secret auth.
+  // Optional shared-secret authentication middleware.
   app.use((req: Request, _res: Response, next: NextFunction) => {
     if (!config.apiKey || req.get('x-api-key') === config.apiKey) {
       next();
@@ -42,30 +49,47 @@ export function createApp(): express.Express {
     next(new HttpError(401, 'invalid or missing x-api-key'));
   });
 
+  // API routes.
   app.use('/api', runRouter);
   app.use('/api', exportRouter);
 
   // Git-managed model repositories (sub-folders of the models volume).
   app.use(
     '/api',
-    createReposRouter({ baseDir: config.modelsDir, segment: 'models', kind: 'model', listKey: 'models' }),
+    createReposRouter({
+      baseDir: config.modelsDir,
+      segment: 'models',
+      kind: 'model',
+      listKey: 'models',
+    }),
   );
+
   // Git-managed script repositories (sub-folders of the scripts volume).
   app.use(
     '/api',
-    createReposRouter({ baseDir: config.scriptsDir, segment: 'scripts', kind: 'script', listKey: 'scripts' }),
+    createReposRouter({
+      baseDir: config.scriptsDir,
+      segment: 'scripts',
+      kind: 'script',
+      listKey: 'scripts',
+    }),
   );
 
+  // 404 handler for unmatched routes.
   app.use((_req: Request, _res: Response, next: NextFunction) => {
     next(new HttpError(404, 'not found'));
   });
 
+  // Global error handler.
   app.use((error: unknown, _req: Request, res: Response, _next: NextFunction) => {
     if (isBodyParserError(error)) {
       const status = error.status ?? 400;
-      res.status(status).json({ error: status === 413 ? 'request body too large' : 'invalid JSON body' });
+      res.status(status).json({
+        error: status === 413 ? 'request body too large' : 'invalid JSON body',
+      });
       return;
     }
+
     if (isHttpError(error)) {
       res.status(error.status).json({
         error: error.message,
@@ -73,6 +97,7 @@ export function createApp(): express.Express {
       });
       return;
     }
+
     log.error('unhandled error', {
       error: String(error),
       stack: error instanceof Error ? error.stack : undefined,

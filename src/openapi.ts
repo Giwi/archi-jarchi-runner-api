@@ -1,6 +1,5 @@
 /**
- * Hand-written OpenAPI 3.0 document served at `/openapi.json`, plus a tiny
- * Swagger UI page served at `/docs`.
+ * Hand-written OpenAPI 3.0 document served at `/openapi.json`.
  */
 export const openApiDocument = {
   openapi: '3.0.3',

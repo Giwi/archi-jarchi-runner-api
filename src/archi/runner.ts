@@ -26,12 +26,15 @@ interface SpawnOutcome {
  */
 async function resolveModel(model: string): Promise<ResolvedModel> {
   const trimmed = model.trim();
-  if (!trimmed) throw new HttpError(400, 'model must be a non-empty string');
+  if (!trimmed) {
+    throw new HttpError(400, 'model must be a non-empty string');
+  }
 
   const base = path.resolve(config.modelsDir);
   const absolute = path.resolve(base, trimmed);
   const relative = path.relative(base, absolute);
 
+  // Ensure the resolved path stays within the models directory
   if (relative === '' || relative.startsWith('..') || path.isAbsolute(relative)) {
     throw new HttpError(400, 'model must reference a path inside the models volume', {
       modelsDir: base,
@@ -45,8 +48,12 @@ async function resolveModel(model: string): Promise<ResolvedModel> {
     throw new HttpError(404, `model not found: ${trimmed}`, { modelsDir: base });
   }
 
-  if (info.isDirectory()) return { path: absolute, mode: 'repo' };
-  if (info.isFile()) return { path: absolute, mode: 'file' };
+  if (info.isDirectory()) {
+    return { path: absolute, mode: 'repo' };
+  }
+  if (info.isFile()) {
+    return { path: absolute, mode: 'file' };
+  }
   throw new HttpError(400, `model path is neither a file nor a directory: ${trimmed}`);
 }
 
@@ -79,6 +86,9 @@ function buildPrelude(
   ].join('\n');
 }
 
+/**
+ * Build command line arguments for Archi CLI.
+ */
 function buildArchiArgs(model: ResolvedModel, scriptPath: string): string[] {
   const args = [
     '-application',
@@ -99,6 +109,9 @@ function buildArchiArgs(model: ResolvedModel, scriptPath: string): string[] {
   return args;
 }
 
+/**
+ * Spawn Archi CLI process with the given arguments.
+ */
 function spawnArchi(args: string[], cwd: string): Promise<SpawnOutcome> {
   return new Promise<SpawnOutcome>((resolve, reject) => {
     const child = spawn(config.archiBinary, args, {
@@ -127,14 +140,18 @@ function spawnArchi(args: string[], cwd: string): Promise<SpawnOutcome> {
     }, config.timeoutMs);
 
     const finish = (outcome: SpawnOutcome) => {
-      if (settled) return;
+      if (settled) {
+        return;
+      }
       settled = true;
       clearTimeout(timer);
       resolve(outcome);
     };
 
     child.on('error', (error) => {
-      if (settled) return;
+      if (settled) {
+        return;
+      }
       settled = true;
       clearTimeout(timer);
       reject(new HttpError(500, `failed to start Archi: ${error.message}`));
@@ -146,6 +163,9 @@ function spawnArchi(args: string[], cwd: string): Promise<SpawnOutcome> {
   });
 }
 
+/**
+ * Run an Archi script based on a request body.
+ */
 export async function runArchi(body: RunRequestBody): Promise<RunResult> {
   return runArchiScript({
     correlationId: body.correlationId,
@@ -175,7 +195,9 @@ export async function runArchiScript(request: RunScriptRequest): Promise<RunResu
   try {
     outcome = await spawnArchi(args, runDir);
   } catch (error) {
-    if (!config.keepRunDirs) await rm(runDir, { recursive: true, force: true });
+    if (!config.keepRunDirs) {
+      await rm(runDir, { recursive: true, force: true });
+    }
     throw error;
   }
   const durationMs = Date.now() - startedAt;
