@@ -34,6 +34,11 @@ export function sanitizeId(raw: unknown): string {
   return id;
 }
 
+/** Whether a folder name is usable as a repository id (matches {@link ID_PATTERN}). */
+function isValidRepoId(name: string): boolean {
+  return ID_PATTERN.test(name);
+}
+
 /** Derive a safe repository id from a git URL's last path segment. */
 function deriveId(url: string): string {
   const withoutQuery = url.split(/[?#]/, 1)[0] ?? url;
@@ -263,7 +268,12 @@ export async function listRepos(baseDir: string, kind: RepoKind): Promise<RepoIn
     return [];
   }
 
-  const dirs = entries.filter((entry) => entry.isDirectory() && !entry.name.startsWith('.'));
+  // Only consider directories whose names form a valid repository id. Skipping
+  // non-conforming names (e.g. a stray "My Model" folder) keeps a single bad
+  // folder from failing the whole listing via sanitizeId's HttpError.
+  const dirs = entries.filter(
+    (entry) => entry.isDirectory() && !entry.name.startsWith('.') && isValidRepoId(entry.name),
+  );
 
   // Filter to actual git repositories in parallel.
   const gitChecks = await Promise.all(

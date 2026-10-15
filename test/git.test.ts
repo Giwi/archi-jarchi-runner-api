@@ -193,6 +193,20 @@ describeWithGit('repository management (local smart-HTTP git)', () => {
     );
   });
 
+  test('listRepos skips git repos with invalid folder names', async () => {
+    // A git repo whose folder name breaks the id pattern would previously fail
+    // the whole listing; it should now be skipped instead.
+    const badDir = path.join(modelsDir, 'My Model');
+    await mkdir(badDir);
+    git(badDir, 'init', '-q', '-b', 'main');
+
+    const repos = await listRepos(modelsDir, 'model');
+    assert.deepEqual(
+      repos.map((r) => r.id),
+      ['demo'],
+    );
+  });
+
   test('syncRepo fast-forwards to the remote', async () => {
     await writeFile(path.join(workDir, 'file.txt'), 'hello again\n');
     git(workDir, 'add', '.');
