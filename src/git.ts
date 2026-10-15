@@ -211,18 +211,42 @@ async function assertRepo(dir: string, id: string, kind: RepoKind): Promise<void
   if (!(await isGitRepo(dir))) fail(409, `"${id}" is not a git-managed ${kind}`);
 }
 
-/** Read stored credentials from a repository's `.git` directory. */
-async function readCredentials(dir: string): Promise<Credentials> {
-  try {
-    const raw = await readFile(path.join(dir, '.git', CREDENTIALS_FILE), 'utf8');
-    const parsed = JSON.parse(raw) as Credentials;
-    if (parsed && typeof parsed === 'object') {
-      return parsed;
-    }
-  } catch {
-    // no stored credentials
+/**
+ * Validate untrusted JSON into a {@link Credentials} object, keeping only
+ * string `username`/`password` fields. Non-string values are dropped so a
+ * corrupt credentials file cannot leak non-string values into the git env.
+ */
+function sanitizeCredentials(value: unknown): Credentials {
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) {
+    return {};
   }
-  return {};
+  const record = value as Record<string, unknown>;
+  const credentials: Credentials = {};
+  if (typeof record.username === 'string') {
+    credentials.username = record.username;
+  }
+  if (typeof record.password === 'string') {
+    credentials.password = record.password;
+  }
+  return credentials;
+}
+
+/** Read stored credentials from a repository's `.git` directory. */
+export async function readCredentials(dir: string): Promise<Credentials> {
+  const file = path.join(dir, '.git', CREDENTIALS_FILE);
+  let raw: string;
+  try {
+    raw = await readFile(file, 'utf8');
+  } catch {
+    return {}; // no stored credentials
+  }
+
+  try {
+    return sanitizeCredentials(JSON.parse(raw));
+  } catch (error) {
+    log.warn('ignoring malformed credentials file', { file, error: String(error) });
+    return {};
+  }
 }
 
 /** Persist credentials to a repository's `.git` directory with restricted permissions. */

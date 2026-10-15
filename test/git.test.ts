@@ -9,7 +9,14 @@ import { spawn } from 'node:child_process';
 import { after, before, describe, test } from 'node:test';
 
 import { HttpError } from '../src/errors.js';
-import { addRepo, listRepos, removeRepo, sanitizeId, syncRepo } from '../src/git.js';
+import {
+  addRepo,
+  listRepos,
+  readCredentials,
+  removeRepo,
+  sanitizeId,
+  syncRepo,
+} from '../src/git.js';
 
 const ENV = {
   ...process.env,
@@ -108,6 +115,52 @@ describe('sanitizeId', () => {
         bad,
       );
     }
+  });
+});
+
+describe('readCredentials', () => {
+  const CREDS_FILE = 'archi-server-credentials.json';
+
+  let root: string;
+  let repo: string;
+
+  before(async () => {
+    root = await mkdtemp(path.join(os.tmpdir(), 'archi-creds-'));
+    repo = path.join(root, 'repo');
+    await mkdir(path.join(repo, '.git'), { recursive: true });
+  });
+
+  after(async () => {
+    await rm(root, { recursive: true, force: true });
+  });
+
+  const writeCreds = (contents: string): Promise<void> =>
+    writeFile(path.join(repo, '.git', CREDS_FILE), contents);
+
+  test('reads valid string credentials', async () => {
+    await writeCreds(JSON.stringify({ username: 'u', password: 'p' }));
+    assert.deepEqual(await readCredentials(repo), { username: 'u', password: 'p' });
+  });
+
+  test('drops non-string fields', async () => {
+    await writeCreds(JSON.stringify({ username: 123, password: ['x'] }));
+    assert.deepEqual(await readCredentials(repo), {});
+  });
+
+  test('keeps valid fields and drops invalid ones', async () => {
+    await writeCreds(JSON.stringify({ username: 'u', password: 42 }));
+    assert.deepEqual(await readCredentials(repo), { username: 'u' });
+  });
+
+  test('returns empty for malformed JSON and non-object roots', async () => {
+    await writeCreds('{ not json');
+    assert.deepEqual(await readCredentials(repo), {});
+    await writeCreds('[1, 2, 3]');
+    assert.deepEqual(await readCredentials(repo), {});
+  });
+
+  test('returns empty when the file is missing', async () => {
+    assert.deepEqual(await readCredentials(path.join(root, 'missing')), {});
   });
 });
 
