@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://giwi.github.io/archi-jarchi-runner-api/sitemap.xml
