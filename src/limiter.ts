@@ -10,6 +10,13 @@ import { QueueFullError, QueueTimeoutError, Semaphore } from './queue.js';
 export const runLimiter = new Semaphore(config.maxConcurrency);
 
 /**
+ * Shared concurrency limiter for git subprocesses (clone/fetch/merge and the
+ * metadata reads behind listing). Independent of the run limiter, so a burst of
+ * repository operations cannot fork unbounded `git` processes.
+ */
+export const gitLimiter = new Semaphore(config.gitMaxConcurrency);
+
+/**
  * Acquire an Archi run slot, translating queue saturation into a 503 so
  * callers get a clear "try again later" instead of an opaque timeout or hang.
  */

@@ -64,6 +64,8 @@ export const config = {
   gitBinary: parseString('GIT_BINARY', 'git'),
   /** Timeout for a single git operation (clone/fetch/merge). */
   gitTimeoutMs: parsePositiveInt('ARCHI_GIT_TIMEOUT_MS', 300_000),
+  /** Max concurrent git subprocesses (clone/fetch/merge and metadata reads). */
+  gitMaxConcurrency: parsePositiveInt('ARCHI_GIT_MAX_CONCURRENCY', 4),
   /** Askpass helper that feeds the access token to git without exposing it in argv. */
   gitAskPass: parseString('ARCHI_GIT_ASKPASS', '/usr/local/bin/git-askpass.sh'),
 

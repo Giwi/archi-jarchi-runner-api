@@ -4,6 +4,7 @@ import path from 'node:path';
 
 import { config } from './config.js';
 import { HttpError } from './errors.js';
+import { gitLimiter } from './limiter.js';
 import { log } from './logger.js';
 import { errorMessage, runProcess, type ProcessResult } from './subprocess.js';
 import type { RepoAddRequest, RepoInfo, RepoKind, RepoSyncRequest } from './types.js';
@@ -141,34 +142,37 @@ interface GitOptions {
 
 /**
  * Run a git command, resolving to its stdout or rejecting with an HttpError.
- * Enforces a timeout and never prompts for credentials.
- */
-/**
- * Run a git command, resolving to its stdout or rejecting with an HttpError.
- * Enforces a timeout and never prompts for credentials.
+ * Enforces a timeout and never prompts for credentials. Concurrency is bounded
+ * by the shared git semaphore, so a burst of operations cannot fork unbounded
+ * subprocesses.
  */
 async function runGit(args: string[], options: GitOptions = {}): Promise<string> {
-  let result: ProcessResult;
+  const release = await gitLimiter.acquire();
   try {
-    result = await runProcess(config.gitBinary, args, {
-      cwd: options.cwd,
-      env: gitEnv(options.credentials ?? {}),
-      timeoutMs: config.gitTimeoutMs,
-    });
-  } catch (error) {
-    throw new HttpError(500, `failed to run git: ${errorMessage(error)}`);
-  }
+    let result: ProcessResult;
+    try {
+      result = await runProcess(config.gitBinary, args, {
+        cwd: options.cwd,
+        env: gitEnv(options.credentials ?? {}),
+        timeoutMs: config.gitTimeoutMs,
+      });
+    } catch (error) {
+      throw new HttpError(500, `failed to run git: ${errorMessage(error)}`);
+    }
 
-  if (result.timedOut) {
-    throw new HttpError(504, `git ${args[0]} timed out after ${config.gitTimeoutMs} ms`);
+    if (result.timedOut) {
+      throw new HttpError(504, `git ${args[0]} timed out after ${config.gitTimeoutMs} ms`);
+    }
+    if (result.exitCode !== 0) {
+      throw new HttpError(502, `git ${args[0]} failed`, {
+        exitCode: result.exitCode,
+        stderr: result.stderr.trim().slice(-4000),
+      });
+    }
+    return result.stdout;
+  } finally {
+    release();
   }
-  if (result.exitCode !== 0) {
-    throw new HttpError(502, `git ${args[0]} failed`, {
-      exitCode: result.exitCode,
-      stderr: result.stderr.trim().slice(-4000),
-    });
-  }
-  return result.stdout;
 }
 
 /**

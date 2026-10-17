@@ -340,6 +340,7 @@ rotate it. Non-fast-forward local commits are refused (the merge only advances).
 | `ARCHI_RUNS_DIR` | `/var/archi/runs` | Per-run scratch dir. |
 | `GIT_BINARY` | `git` | git executable used for repository management. |
 | `ARCHI_GIT_TIMEOUT_MS` | `300000` | Timeout for a single git operation. |
+| `ARCHI_GIT_MAX_CONCURRENCY` | `4` | Max concurrent git subprocesses (clone/fetch/merge and listing). |
 | `ARCHI_GIT_ASKPASS` | `/usr/local/bin/git-askpass.sh` | Helper that feeds the access token to git. |
 | `ARCHI_XMS` | `256m` | JVM initial heap (written to `Archi.ini`). |
 | `ARCHI_XMX` | `2g` | JVM max heap (written to `Archi.ini`). |
