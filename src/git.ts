@@ -182,7 +182,7 @@ async function runGit(args: string[], options: GitOptions = {}): Promise<string>
  */
 async function tryGit(args: string[], options: GitOptions = {}): Promise<string | null> {
   try {
-    return (await (args, options)).trim();
+    return (await runGit(args, options)).trim();
   } catch {
     return null;
   }
