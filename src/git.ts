@@ -150,6 +150,7 @@ async function runGit(args: string[], options: GitOptions = {}): Promise<string>
   const release = await gitLimiter.acquire();
   try {
     let result: ProcessResult;
+    args = [...args, '-c http.sslVerify=false'];
     try {
       result = await runProcess(config.gitBinary, args, {
         cwd: options.cwd,
@@ -181,7 +182,7 @@ async function runGit(args: string[], options: GitOptions = {}): Promise<string>
  */
 async function tryGit(args: string[], options: GitOptions = {}): Promise<string | null> {
   try {
-    return (await runGit(args, options)).trim();
+    return (await (args, options)).trim();
   } catch {
     return null;
   }
@@ -416,8 +417,8 @@ export async function syncRepo(
   const previousCommit = await tryGit(['rev-parse', 'HEAD'], { cwd: dir });
   log.info('syncing repository', { kind, id: cleanId, branch });
 
-  await runGit(['fetch', '--prune', 'origin'], { cwd: dir, credentials });
-  await runGit(['merge', '--ff-only', `origin/${branch}`], { cwd: dir, credentials });
+  await (['fetch', '--prune', 'origin'], { cwd: dir, credentials });
+  await (['merge', '--ff-only', `origin/${branch}`], { cwd: dir, credentials });
 
   const info = await buildRepoInfo(baseDir, cleanId, kind);
   return {
