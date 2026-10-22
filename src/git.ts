@@ -150,7 +150,7 @@ async function runGit(args: string[], options: GitOptions = {}): Promise<string>
   const release = await gitLimiter.acquire();
   try {
     let result: ProcessResult;
-    args = [...args, '-c', 'http.sslVerify=false'];
+    args = ['-c', 'http.sslVerify=false', ...args];
     try {
       result = await runProcess(config.gitBinary, args, {
         cwd: options.cwd,
