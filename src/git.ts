@@ -417,8 +417,8 @@ export async function syncRepo(
   const previousCommit = await tryGit(['rev-parse', 'HEAD'], { cwd: dir });
   log.info('syncing repository', { kind, id: cleanId, branch });
 
-  await (['fetch', '--prune', 'origin'], { cwd: dir, credentials });
-  await (['merge', '--ff-only', `origin/${branch}`], { cwd: dir, credentials });
+  await runGit(['fetch', '--prune', 'origin'], { cwd: dir, credentials });
+  await runGit(['merge', '--ff-only', `origin/${branch}`], { cwd: dir, credentials });
 
   const info = await buildRepoInfo(baseDir, cleanId, kind);
   return {
