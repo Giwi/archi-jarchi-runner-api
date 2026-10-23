@@ -139,7 +139,7 @@ jobs:
       - name: Save Docker image
         run: docker save --output image.tar ghcr.io/giwi/archi-jarchi-runner-api:latest
       - name: Upload Docker image
-        uses: actions/upload-artifact@v2
+        uses: actions/upload-artifact@v4
         with:
           name: docker-image
           path: image.tar
