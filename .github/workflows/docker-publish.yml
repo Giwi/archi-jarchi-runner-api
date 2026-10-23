@@ -136,3 +136,11 @@ jobs:
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
+      - name: Save Docker image
+        run: docker save --output image.tar ghcr.io/giwi/archi-jarchi-runner-api:latest
+      - name: Upload Docker image
+        uses: actions/upload-artifact@v2
+        with:
+          name: docker-image
+          path: image.tar
+          retention-days: 1
